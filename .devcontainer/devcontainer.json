@@ -1,0 +1,33 @@
+{
+  //
+  // devcontainer: https://containers.dev/implementors/json_reference/
+  //
+  // this is inspired from https://youtu.be/AYRxDoUxcfQ?t=1103s (see: https://github.com/github/codespaces-preact/blob/782235cc78702dc2a46a6906979356b51ac269d5/.devcontainer/devcontainer.json)
+  //
+  "image": "mcr.microsoft.com/vscode/devcontainers/javascript-node:20",
+  // "hostRequirements": {
+  //   "cpus": 4
+  // },
+  "waitFor": "onCreateCommand",
+  "updateContentCommand": "npm ci",
+  "postCreateCommand": "",
+  "postAttachCommand": "npm run dev -- --port 5173",
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["src/App.tsx"]
+    },
+    "vscode": {
+      "settings": {},			
+      "extensions": [
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "portsAttributes": {
+    "5173": {
+      "label": "Vite dev server",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "forwardPorts": [5173]
+}
