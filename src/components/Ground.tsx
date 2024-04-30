@@ -9,7 +9,10 @@ function Ground() {
     >
       <mesh receiveShadow>
         <boxGeometry args={[100, 100, 0.1]} />
-        <meshStandardMaterial color="gray" transparent opacity={0.8} />
+        <meshStandardMaterial
+          color="gray"
+          // transparent opacity={0.8}
+        />
       </mesh>
     </RigidBody>
   );

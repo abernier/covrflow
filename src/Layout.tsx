@@ -1,12 +1,14 @@
 import * as THREE from "three";
+import { SpotLightHelper } from "three";
+
 import { type ElementRef, type ReactNode, useEffect, useRef } from "react";
+// import { useFrame } from "@react-three/fiber";
 import { useXR } from "@react-three/xr";
-import { Environment, PerspectiveCamera } from "@react-three/drei";
+import { Environment, PerspectiveCamera, useHelper } from "@react-three/drei";
 
 import { useControls, folder } from "leva";
 
 import Gamepads from "./Gamepads";
-import { useFrame } from "@react-three/fiber";
 
 function Layout({
   children,
@@ -27,6 +29,9 @@ function Layout({
   }));
   // console.log("gui=", gui);
 
+  const spotLightHelper = useRef();
+  useHelper(spotLightHelper, SpotLightHelper, "yellow");
+
   return (
     <>
       <Camera />
@@ -41,6 +46,7 @@ function Layout({
       </Environment>
 
       <spotLight
+        ref={spotLightHelper}
         position={[15, 15, 15]}
         // angle={0.3}
         penumbra={1}
@@ -48,9 +54,9 @@ function Layout({
         intensity={2}
         shadow-bias={-0.0001}
       />
-      <ambientLight intensity={1} />
+      <ambientLight intensity={2} />
 
-      {gui.grid && <gridHelper args={[30, 30, 30]} position-y=".01" />}
+      {/* {gui.grid && <gridHelper args={[30, 30, 30]} position-y=".01" />} */}
       {gui.axes && <axesHelper args={[5]} />}
 
       {children}
@@ -63,7 +69,7 @@ function Camera() {
     Camera: folder(
       {
         fov: 50,
-        position: { value: [7, 4.0, 21.0], step: 0.1 }, // ~= position of the camera (the player holds the camera)
+        position: { value: [0, 1.0, 21.0], step: 0.1 }, // ~= position of the camera (the player holds the camera)
         lookAt: {
           value: [0, 0, 0],
           step: 0.1,
