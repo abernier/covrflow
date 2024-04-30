@@ -32,7 +32,11 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-      - run: npm ci
+      - run: |
+          cp .npmrc-dist .npmrc
+          npm ci
+        env:
+          GSAP_NPM_TOKEN: ${{ secrets.GSAP_NPM_TOKEN }}
       - run: npx vite build --base="/$REPONAME/"
         env:
           USERNAME: ${{ github.repository_owner }}

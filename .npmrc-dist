@@ -1,0 +1,6 @@
+always-auth=true
+//npm.greensock.com/:_authToken=${GSAP_NPM_TOKEN}
+@gsap:registry=https://npm.greensock.com
+
+registry=https://registry.npmjs.org/
+

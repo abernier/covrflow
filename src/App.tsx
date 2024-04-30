@@ -268,7 +268,7 @@ function Scene() {
       tl.add(tl3, 0);
       tl.add(tl4, 0);
     },
-    { dependencies: [] }
+    { dependencies: [tl] }
   );
 
   //
