@@ -11,12 +11,19 @@ import { useControls } from "leva";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
-function arr2Vec(arr: [number, number, number]) {
-  return { x: arr[0], y: arr[1], z: arr[2] };
+function arr2vec(arr: [number, number, number]) {
+  const [x, y, z] = arr;
+
+  return { x, y, z };
 }
 
-// Fonction pour ajuster x dans l'intervalle [0, 1]
 function adjustToTimeline(x: number) {
+  //
+  // Fonction pour ajuster x dans l'intervalle [0, 1]
+  //
+  // https://chat.openai.com/share/743ba98b-a8b0-488b-af0c-0aac705233d3
+  //
+
   x = x % 1; // Utilisation du modulo pour limiter x entre -1 et 1
   if (x < 0) x += 1; // Ajustement pour que x soit toujours positif
   return x;
@@ -146,13 +153,13 @@ export const Covrflow = forwardRef<
 
       const tw1Pos = gsap.fromTo(
         panel1Ref.current.position,
-        arr2Vec(STATES.backleft.position),
-        { ...arr2Vec(STATES.left.position), duration, ease }
+        arr2vec(STATES.backleft.position),
+        { ...arr2vec(STATES.left.position), duration, ease }
       );
       const tw1Rot = gsap.fromTo(
         panel1Ref.current.rotation,
-        arr2Vec(STATES.backleft.rotation),
-        { ...arr2Vec(STATES.left.rotation), duration, ease }
+        arr2vec(STATES.backleft.rotation),
+        { ...arr2vec(STATES.left.rotation), duration, ease }
       );
       const tw1Transparency = gsap.fromTo(
         panel1Ref.current.material,
@@ -176,13 +183,13 @@ export const Covrflow = forwardRef<
 
       const tw2Pos = gsap.fromTo(
         panel2Ref.current.position,
-        arr2Vec(STATES.left.position),
-        { ...arr2Vec(STATES.front.position), duration, ease }
+        arr2vec(STATES.left.position),
+        { ...arr2vec(STATES.front.position), duration, ease }
       );
       const tw2Rot = gsap.fromTo(
         panel2Ref.current.rotation,
-        arr2Vec(STATES.left.rotation),
-        { ...arr2Vec(STATES.front.rotation), duration, ease }
+        arr2vec(STATES.left.rotation),
+        { ...arr2vec(STATES.front.rotation), duration, ease }
       );
 
       tl2.add(tw2Rot, 0);
@@ -196,13 +203,13 @@ export const Covrflow = forwardRef<
 
       const tw3Pos = gsap.fromTo(
         panel3Ref.current.position,
-        arr2Vec(STATES.front.position),
-        { ...arr2Vec(STATES.right.position), duration, ease }
+        arr2vec(STATES.front.position),
+        { ...arr2vec(STATES.right.position), duration, ease }
       );
       const tw3Rot = gsap.fromTo(
         panel3Ref.current.rotation,
-        arr2Vec(STATES.front.rotation),
-        { ...arr2Vec(STATES.right.rotation), duration, ease }
+        arr2vec(STATES.front.rotation),
+        { ...arr2vec(STATES.right.rotation), duration, ease }
       );
 
       tl3.add(tw3Rot, 0);
@@ -216,13 +223,13 @@ export const Covrflow = forwardRef<
 
       const tw4Pos = gsap.fromTo(
         panel4Ref.current.position,
-        arr2Vec(STATES.right.position),
-        { ...arr2Vec(STATES.backright.position), duration, ease }
+        arr2vec(STATES.right.position),
+        { ...arr2vec(STATES.backright.position), duration, ease }
       );
       const tw4Rot = gsap.fromTo(
         panel4Ref.current.rotation,
-        arr2Vec(STATES.right.rotation),
-        { ...arr2Vec(STATES.backright.rotation), duration, ease }
+        arr2vec(STATES.right.rotation),
+        { ...arr2vec(STATES.backright.rotation), duration, ease }
       );
       const tw4Transparency = gsap.fromTo(
         panel4Ref.current.material,
