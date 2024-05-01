@@ -29,8 +29,8 @@ function Layout({
   }));
   // console.log("gui=", gui);
 
-  const spotLightHelper = useRef();
-  useHelper(spotLightHelper, SpotLightHelper, "yellow");
+  const spotLightRef = useRef(null);
+  useHelper(spotLightRef, SpotLightHelper, "yellow");
 
   return (
     <>
@@ -46,7 +46,7 @@ function Layout({
       </Environment>
 
       <spotLight
-        ref={spotLightHelper}
+        ref={spotLightRef}
         position={[15, 15, 15]}
         // angle={0.3}
         penumbra={1}
