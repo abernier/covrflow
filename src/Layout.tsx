@@ -68,8 +68,8 @@ function Camera() {
   const [gui, setGui] = useControls(() => ({
     Camera: folder(
       {
-        fov: 50,
-        position: { value: [0, 1.0, 21.0], step: 0.1 }, // ~= position of the camera (the player holds the camera)
+        fov: 40,
+        position: { value: [0, 2.0, 21.0], step: 0.1 }, // ~= position of the camera (the player holds the camera)
         lookAt: {
           value: [0, 0, 0],
           step: 0.1,

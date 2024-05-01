@@ -10,6 +10,8 @@ import { Box } from "@react-three/drei";
 import { useControls } from "leva";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useDrag } from "@use-gesture/react";
+import { useSpring, animated } from "@react-spring/three";
 
 function arr2vec(arr: [number, number, number]) {
   const [x, y, z] = arr;
@@ -34,15 +36,15 @@ const r = 5;
 const STATES = {
   backleft: {
     position: [
-      -2 * r * Math.cos(Math.PI / 6),
+      -2 * r * Math.cos(Math.PI / 3),
       0,
-      -1.5 * r * Math.sin(Math.PI / 6),
+      -1.5 * r * Math.sin(Math.PI / 3),
     ],
     rotation: [0, Math.PI / 3, 0],
     opacity: 0,
   },
   left: {
-    position: [-r * Math.cos(Math.PI / 6), 0, -r * Math.sin(Math.PI / 6)],
+    position: [-r * Math.cos(Math.PI / 3), 0, -r * Math.sin(Math.PI / 3)],
     rotation: [0, Math.PI / 3, 0],
     opacity: 1,
   },
@@ -52,15 +54,15 @@ const STATES = {
     opacity: 1,
   },
   right: {
-    position: [r * Math.cos(Math.PI / 6), 0, -r * Math.sin(Math.PI / 6)],
+    position: [r * Math.cos(Math.PI / 3), 0, -r * Math.sin(Math.PI / 3)],
     rotation: [0, -Math.PI / 3, 0],
     opacity: 1,
   },
   backright: {
     position: [
-      2 * r * Math.cos(Math.PI / 6),
+      2 * r * Math.cos(Math.PI / 3),
       0,
-      -1.5 * r * Math.sin(Math.PI / 6),
+      -1.5 * r * Math.sin(Math.PI / 3),
     ],
     rotation: [0, -Math.PI / 3, 0],
     opacity: 0,
@@ -72,6 +74,12 @@ const STATES = {
     opacity: number;
   };
 };
+
+// ██████   █████  ███    ██ ███████ ██
+// ██   ██ ██   ██ ████   ██ ██      ██
+// ██████  ███████ ██ ██  ██ █████   ██
+// ██      ██   ██ ██  ██ ██ ██      ██
+// ██      ██   ██ ██   ████ ███████ ███████
 
 const Panel = forwardRef<
   ElementRef<typeof Box>,
@@ -89,6 +97,8 @@ const Panel = forwardRef<
     rotation: STATES[state].rotation,
   };
 
+  const size: [number, number, number] = [3, 5, 0.1];
+
   return (
     <>
       {!debugOnly && (
@@ -96,7 +106,7 @@ const Panel = forwardRef<
           castShadow
           receiveShadow
           ref={ref}
-          args={[3, 5, 0.1]}
+          args={size}
           {...posRot}
           {...props}
           onPointerEnter={() => {
@@ -113,13 +123,19 @@ const Panel = forwardRef<
       )}
 
       {debug && (
-        <Box args={[3, 5, 0.1]} {...posRot} {...props}>
+        <Box args={size} {...posRot} {...props}>
           <meshStandardMaterial wireframe color="#aaa" />
         </Box>
       )}
     </>
   );
 });
+
+//  ██████  ██████  ██    ██ ██████  ███████ ██       ██████  ██     ██
+// ██      ██    ██ ██    ██ ██   ██ ██      ██      ██    ██ ██     ██
+// ██      ██    ██ ██    ██ ██████  █████   ██      ██    ██ ██  █  ██
+// ██      ██    ██  ██  ██  ██   ██ ██      ██      ██    ██ ██ ███ ██
+//  ██████  ██████    ████   ██   ██ ██      ███████  ██████   ███ ███
 
 export const Covrflow = forwardRef<
   ElementRef<"group">,
@@ -271,18 +287,64 @@ export const Covrflow = forwardRef<
     },
   }));
 
-  useEffect(() => {
-    tl.seek(adjustToTimeline(gui.seek));
-  }, [tl, gui.seek]);
+  const defaultSpring = { mass: 1, tension: 800 };
+  const [springs, api] = useSpring(() => ({
+    position: [0, 0, 0],
+    config: {
+      mass: defaultSpring.mass,
+      friction: 40,
+      tension: defaultSpring.tension,
+    },
+    onChange: ({
+      value: {
+        position: [x, y, z],
+      },
+    }) => {
+      console.log(x);
+      tl.seek(adjustToTimeline(x));
+    },
+  }));
+  const bind = useDrag(({ event, movement: [mx], offset: [ox], down }) => {
+    event.stopPropagation();
+
+    const dx = (1 / 20) * mx;
+
+    api.start({
+      position: down ? [dx, 0, 0] : [0, 0, 0],
+      config: {
+        mass: down ? defaultSpring.mass : 4,
+        tension: down ? 2000 : defaultSpring.tension,
+      },
+    });
+  });
+
+  // useEffect(() => {
+  //   const x = springs.position.to((x, y, z) => [x]);
+  //   console.log(x);
+  //   tl.seek(adjustToTimeline(Number(x)));
+  // }, [tl, springs.position]);
 
   return (
-    <group position={[0, 2.5, 0]}>
-      <Panel ref={panel1Ref} state="backleft" debug />
-      <Panel ref={panel2Ref} state="left" debug />
-      <Panel ref={panel3Ref} state="front" debug />
-      <Panel ref={panel4Ref} state="right" debug />
+    <>
+      <group position={[0, 2.5, 0]}>
+        <Panel ref={panel1Ref} state="backleft" debug />
+        <Panel ref={panel2Ref} state="left" debug />
+        <Panel ref={panel3Ref} state="front" debug />
+        <Panel ref={panel4Ref} state="right" debug />
 
-      <Panel state="backright" debug debugOnly />
-    </group>
+        <Panel state="backright" debug debugOnly />
+      </group>
+
+      <group position={[0, 0.15, 10]}>
+        <animated.mesh
+          position={springs.position.to((x, y, z) => [x, y, z])}
+          {...(bind() as any)}
+          castShadow
+        >
+          <sphereGeometry args={[0.15, 64, 64]} />
+          <meshNormalMaterial />
+        </animated.mesh>
+      </group>
+    </>
   );
 });
