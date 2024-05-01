@@ -49,10 +49,12 @@ function Layout({
         ref={spotLightRef}
         position={[15, 15, 15]}
         // angle={0.3}
-        penumbra={1}
+        penumbra={2}
         castShadow
-        intensity={2}
+        intensity={500}
         shadow-bias={-0.0001}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
       />
       <ambientLight intensity={2} />
 
@@ -68,8 +70,8 @@ function Camera() {
   const [gui, setGui] = useControls(() => ({
     Camera: folder(
       {
-        fov: 40,
-        position: { value: [0, 2.0, 21.0], step: 0.1 }, // ~= position of the camera (the player holds the camera)
+        fov: 30,
+        position: { value: [0, 1.8, 21.0], step: 0.1 }, // ~= position of the camera (the player holds the camera)
         lookAt: {
           value: [0, 0, 0],
           step: 0.1,

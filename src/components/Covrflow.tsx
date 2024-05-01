@@ -189,15 +189,16 @@ function Scroller({ setSeek }: { setSeek: (val: number) => void }) {
     });
   });
 
+  const r = 0.3;
   return (
     <>
-      <group position={[0, 0.15, 10]}>
+      <group position={[0, r, 10]}>
         <animated.mesh
           position={springs.position.to((x, y, z) => [x, y, z])}
           {...(bind() as any)}
           castShadow
         >
-          <sphereGeometry args={[0.15, 64, 64]} />
+          <sphereGeometry args={[r, 64, 64]} />
           <meshNormalMaterial />
         </animated.mesh>
       </group>
@@ -258,7 +259,7 @@ export const Covrflow = forwardRef<
           opacity: STATES.left.opacity,
           transparent: true,
           duration,
-          ease: "circ.in",
+          // ease: "circ.in",
         }
       );
 
@@ -329,7 +330,7 @@ export const Covrflow = forwardRef<
           opacity: STATES.backright.opacity,
           transparent: true,
           duration,
-          ease: "circ.in",
+          // ease: "circ.in",
         }
       );
 
@@ -374,7 +375,7 @@ export const Covrflow = forwardRef<
   const debug = gui.debug;
   return (
     <>
-      <group position={[0, 2.5, 0]}>
+      <group position={[0, 2.5 + 0.01, 0]}>
         <Panel ref={panel1Ref} state="backleft" debug={debug}>
           <meshStandardMaterial color={circular(Math.floor(seek) - 0 + 2)} />
         </Panel>
