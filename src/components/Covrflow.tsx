@@ -2,6 +2,7 @@ import {
   ComponentProps,
   ElementRef,
   forwardRef,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -12,6 +13,26 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useDrag } from "@use-gesture/react";
 import { useSpring, animated } from "@react-spring/three";
+
+const content = [
+  "#ecfdf5",
+  "#d1fae5",
+  "#a7f3d0",
+  "#6ee7b7",
+  "#34d399",
+  "#10b981",
+  "#059669",
+  "#047857",
+  "#065f46",
+  "#064e3b",
+  "#022c22",
+].reverse();
+
+function circular(i: number) {
+  return content.at(
+    (i + (Math.floor(content.length / 2) - 1)) % content.length
+  );
+}
 
 function arr2vec(arr: [number, number, number]) {
   const [x, y, z] = arr;
@@ -124,14 +145,19 @@ const Panel = forwardRef<
 
       {debug && (
         <Box args={size} {...posRot} {...props}>
-          <meshStandardMaterial wireframe color="#aaa" />
+          <meshStandardMaterial
+            wireframe
+            color="#aaa"
+            // opacity={0.25}
+            // transparent
+          />
         </Box>
       )}
     </>
   );
 });
 
-function Scroller({ tl }: { tl: gsap.core.Timeline }) {
+function Scroller({ setSeek }: { setSeek: (val: number) => void }) {
   const defaultSpring = { mass: 1, tension: 800 };
   const [springs, api] = useSpring(() => ({
     position: [0, 0, 0],
@@ -146,7 +172,7 @@ function Scroller({ tl }: { tl: gsap.core.Timeline }) {
       },
     }) => {
       console.log(x);
-      tl.seek(adjustToTimeline(x));
+      setSeek(x);
     },
   }));
   const bind = useDrag(({ event, movement: [mx], offset: [ox], down }) => {
@@ -227,9 +253,10 @@ export const Covrflow = forwardRef<
       );
       const tw1Transparency = gsap.fromTo(
         panel1Ref.current.material,
-        { opacity: STATES.backleft.opacity },
+        { opacity: STATES.backleft.opacity, transparent: true },
         {
           opacity: STATES.left.opacity,
+          transparent: true,
           duration,
           ease: "circ.in",
         }
@@ -297,9 +324,10 @@ export const Covrflow = forwardRef<
       );
       const tw4Transparency = gsap.fromTo(
         panel4Ref.current.material,
-        { opacity: STATES.right.opacity },
+        { opacity: STATES.right.opacity, transparent: true },
         {
           opacity: STATES.backright.opacity,
+          transparent: true,
           duration,
           ease: "circ.in",
         }
@@ -329,27 +357,41 @@ export const Covrflow = forwardRef<
   const [gui, setGui] = useControls(() => ({
     seek: {
       value: 0,
-      min: -9.9,
-      max: 9.9,
+      min: -19.9,
+      max: 29.9,
       step: 0.001,
     },
+    debug: true,
   }));
-  useEffect(() => {
-    tl.seek(adjustToTimeline(gui.seek));
-  }, [tl, gui.seek]);
 
+  const seek = gui.seek;
+  const setSeek = useCallback((seek: number) => setGui({ seek }), [setGui]);
+
+  useEffect(() => {
+    tl.seek(adjustToTimeline(seek));
+  }, [tl, seek]);
+
+  const debug = gui.debug;
   return (
     <>
       <group position={[0, 2.5, 0]}>
-        <Panel ref={panel1Ref} state="backleft" debug />
-        <Panel ref={panel2Ref} state="left" debug />
-        <Panel ref={panel3Ref} state="front" debug />
-        <Panel ref={panel4Ref} state="right" debug />
+        <Panel ref={panel1Ref} state="backleft" debug={debug}>
+          <meshStandardMaterial color={circular(Math.floor(seek) - 0 + 2)} />
+        </Panel>
+        <Panel ref={panel2Ref} state="left" debug={debug}>
+          <meshStandardMaterial color={circular(Math.floor(seek) - 1 + 2)} />
+        </Panel>
+        <Panel ref={panel3Ref} state="front" debug={debug}>
+          <meshStandardMaterial color={circular(Math.floor(seek) - 2 + 2)} />
+        </Panel>
+        <Panel ref={panel4Ref} state="right" debug={debug}>
+          <meshStandardMaterial color={circular(Math.floor(seek) - 3 + 2)} />
+        </Panel>
 
-        <Panel state="backright" debug debugOnly />
+        <Panel state="backright" debug={debug} debugOnly />
       </group>
 
-      <Scroller tl={tl} />
+      <Scroller setSeek={setSeek} />
     </>
   );
 });
