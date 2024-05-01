@@ -68,8 +68,12 @@ const STATES = {
 
 const Panel = forwardRef<
   ElementRef<typeof Box>,
-  ComponentProps<typeof Box> & { state: keyof typeof STATES; debug?: boolean }
->(({ state, children, debug, ...props }, ref) => {
+  ComponentProps<typeof Box> & {
+    state: keyof typeof STATES;
+    debug?: boolean;
+    debugOnly?: boolean;
+  }
+>(({ state, children, debug, debugOnly = false, ...props }, ref) => {
   const defaultColor = "#ccc";
   const [color, setColor] = useState(defaultColor);
 
@@ -80,24 +84,27 @@ const Panel = forwardRef<
 
   return (
     <>
-      <Box
-        castShadow
-        receiveShadow
-        ref={ref}
-        args={[3, 5, 0.1]}
-        {...posRot}
-        {...props}
-        onPointerEnter={() => {
-          setColor("white");
-        }}
-        onPointerLeave={() => {
-          setColor(defaultColor);
-        }}
-      >
-        {children || (
-          <meshStandardMaterial transparent opacity={1} color={color} />
-        )}
-      </Box>
+      {!debugOnly && (
+        <Box
+          castShadow
+          receiveShadow
+          ref={ref}
+          args={[3, 5, 0.1]}
+          {...posRot}
+          {...props}
+          onPointerEnter={() => {
+            setColor("white");
+          }}
+          onPointerLeave={() => {
+            setColor(defaultColor);
+          }}
+        >
+          {children || (
+            <meshStandardMaterial transparent opacity={1} color={color} />
+          )}
+        </Box>
+      )}
+
       {debug && (
         <Box args={[3, 5, 0.1]} {...posRot} {...props}>
           <meshStandardMaterial wireframe color="#aaa" />
@@ -267,6 +274,8 @@ export const Covrflow = forwardRef<
       <Panel ref={panel2Ref} state="left" debug />
       <Panel ref={panel3Ref} state="front" debug />
       <Panel ref={panel4Ref} state="right" debug />
+
+      <Panel state="backright" debug debugOnly />
     </group>
   );
 });
