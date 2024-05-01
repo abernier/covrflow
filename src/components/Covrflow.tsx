@@ -67,10 +67,27 @@ const POSITIONS = {
 };
 
 const Panel = forwardRef<ElementRef<typeof Box>, ComponentProps<typeof Box>>(
-  (props, ref) => {
+  ({ children, ...props }, ref) => {
+    const defaultColor = "#ccc";
+    const [color, setColor] = useState(defaultColor);
+
     return (
-      <Box castShadow receiveShadow ref={ref} args={[3, 5, 0.1]} {...props}>
-        <meshStandardMaterial transparent opacity={1} />
+      <Box
+        castShadow
+        receiveShadow
+        ref={ref}
+        args={[3, 5, 0.1]}
+        {...props}
+        onPointerEnter={() => {
+          setColor("white");
+        }}
+        onPointerLeave={() => {
+          setColor(defaultColor);
+        }}
+      >
+        {children || (
+          <meshStandardMaterial transparent opacity={1} color={color} />
+        )}
       </Box>
     );
   }
@@ -236,6 +253,10 @@ export const Covrflow = forwardRef<
       <Panel ref={panel2Ref} position={POSITIONS.left.position} />
       <Panel ref={panel3Ref} position={POSITIONS.front.position} />
       <Panel ref={panel4Ref} position={POSITIONS.right.position} />
+
+      <Panel position={POSITIONS.front.position}>
+        <meshStandardMaterial wireframe color="#aaa" />
+      </Panel>
     </group>
   );
 });
