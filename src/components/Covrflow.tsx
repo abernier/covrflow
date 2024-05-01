@@ -131,6 +131,54 @@ const Panel = forwardRef<
   );
 });
 
+function Scroller({ tl }: { tl: gsap.core.Timeline }) {
+  const defaultSpring = { mass: 1, tension: 800 };
+  const [springs, api] = useSpring(() => ({
+    position: [0, 0, 0],
+    config: {
+      mass: defaultSpring.mass,
+      friction: 40,
+      tension: defaultSpring.tension,
+    },
+    onChange: ({
+      value: {
+        position: [x, y, z],
+      },
+    }) => {
+      console.log(x);
+      tl.seek(adjustToTimeline(x));
+    },
+  }));
+  const bind = useDrag(({ event, movement: [mx], offset: [ox], down }) => {
+    event.stopPropagation();
+
+    const dx = (1 / 20) * mx;
+
+    api.start({
+      position: down ? [dx, 0, 0] : [0, 0, 0],
+      config: {
+        mass: down ? defaultSpring.mass : 4,
+        tension: down ? 2000 : defaultSpring.tension,
+      },
+    });
+  });
+
+  return (
+    <>
+      <group position={[0, 0.15, 10]}>
+        <animated.mesh
+          position={springs.position.to((x, y, z) => [x, y, z])}
+          {...(bind() as any)}
+          castShadow
+        >
+          <sphereGeometry args={[0.15, 64, 64]} />
+          <meshNormalMaterial />
+        </animated.mesh>
+      </group>
+    </>
+  );
+}
+
 //  ██████  ██████  ██    ██ ██████  ███████ ██       ██████  ██     ██
 // ██      ██    ██ ██    ██ ██   ██ ██      ██      ██    ██ ██     ██
 // ██      ██    ██ ██    ██ ██████  █████   ██      ██    ██ ██  █  ██
@@ -286,43 +334,9 @@ export const Covrflow = forwardRef<
       step: 0.001,
     },
   }));
-
-  const defaultSpring = { mass: 1, tension: 800 };
-  const [springs, api] = useSpring(() => ({
-    position: [0, 0, 0],
-    config: {
-      mass: defaultSpring.mass,
-      friction: 40,
-      tension: defaultSpring.tension,
-    },
-    onChange: ({
-      value: {
-        position: [x, y, z],
-      },
-    }) => {
-      console.log(x);
-      tl.seek(adjustToTimeline(x));
-    },
-  }));
-  const bind = useDrag(({ event, movement: [mx], offset: [ox], down }) => {
-    event.stopPropagation();
-
-    const dx = (1 / 20) * mx;
-
-    api.start({
-      position: down ? [dx, 0, 0] : [0, 0, 0],
-      config: {
-        mass: down ? defaultSpring.mass : 4,
-        tension: down ? 2000 : defaultSpring.tension,
-      },
-    });
-  });
-
-  // useEffect(() => {
-  //   const x = springs.position.to((x, y, z) => [x]);
-  //   console.log(x);
-  //   tl.seek(adjustToTimeline(Number(x)));
-  // }, [tl, springs.position]);
+  useEffect(() => {
+    tl.seek(adjustToTimeline(gui.seek));
+  }, [tl, gui.seek]);
 
   return (
     <>
@@ -335,16 +349,7 @@ export const Covrflow = forwardRef<
         <Panel state="backright" debug debugOnly />
       </group>
 
-      <group position={[0, 0.15, 10]}>
-        <animated.mesh
-          position={springs.position.to((x, y, z) => [x, y, z])}
-          {...(bind() as any)}
-          castShadow
-        >
-          <sphereGeometry args={[0.15, 64, 64]} />
-          <meshNormalMaterial />
-        </animated.mesh>
-      </group>
+      <Scroller tl={tl} />
     </>
   );
 });
