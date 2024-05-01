@@ -24,7 +24,7 @@ function adjustToTimeline(x: number) {
 
 const r = 5;
 
-const POSITIONS = {
+const STATES = {
   backleft: {
     position: [
       -2 * r * Math.cos(Math.PI / 6),
@@ -66,17 +66,26 @@ const POSITIONS = {
   };
 };
 
-const Panel = forwardRef<ElementRef<typeof Box>, ComponentProps<typeof Box>>(
-  ({ children, ...props }, ref) => {
-    const defaultColor = "#ccc";
-    const [color, setColor] = useState(defaultColor);
+const Panel = forwardRef<
+  ElementRef<typeof Box>,
+  ComponentProps<typeof Box> & { state: keyof typeof STATES; debug?: boolean }
+>(({ state, children, debug, ...props }, ref) => {
+  const defaultColor = "#ccc";
+  const [color, setColor] = useState(defaultColor);
 
-    return (
+  const posRot = {
+    position: STATES[state].position,
+    rotation: STATES[state].rotation,
+  };
+
+  return (
+    <>
       <Box
         castShadow
         receiveShadow
         ref={ref}
         args={[3, 5, 0.1]}
+        {...posRot}
         {...props}
         onPointerEnter={() => {
           setColor("white");
@@ -89,9 +98,14 @@ const Panel = forwardRef<ElementRef<typeof Box>, ComponentProps<typeof Box>>(
           <meshStandardMaterial transparent opacity={1} color={color} />
         )}
       </Box>
-    );
-  }
-);
+      {debug && (
+        <Box args={[3, 5, 0.1]} {...posRot} {...props}>
+          <meshStandardMaterial wireframe color="#aaa" />
+        </Box>
+      )}
+    </>
+  );
+});
 
 export const Covrflow = forwardRef<
   ElementRef<"group">,
@@ -125,19 +139,19 @@ export const Covrflow = forwardRef<
 
       const tw1Pos = gsap.fromTo(
         panel1Ref.current.position,
-        arr2Vec(POSITIONS.backleft.position),
-        { ...arr2Vec(POSITIONS.left.position), duration, ease }
+        arr2Vec(STATES.backleft.position),
+        { ...arr2Vec(STATES.left.position), duration, ease }
       );
       const tw1Rot = gsap.fromTo(
         panel1Ref.current.rotation,
-        arr2Vec(POSITIONS.backleft.rotation),
-        { ...arr2Vec(POSITIONS.left.rotation), duration, ease }
+        arr2Vec(STATES.backleft.rotation),
+        { ...arr2Vec(STATES.left.rotation), duration, ease }
       );
       const tw1Transparency = gsap.fromTo(
         panel1Ref.current.material,
-        { opacity: POSITIONS.backleft.opacity },
+        { opacity: STATES.backleft.opacity },
         {
-          opacity: POSITIONS.left.opacity,
+          opacity: STATES.left.opacity,
           duration,
           ease: "circ.in",
         }
@@ -155,13 +169,13 @@ export const Covrflow = forwardRef<
 
       const tw2Pos = gsap.fromTo(
         panel2Ref.current.position,
-        arr2Vec(POSITIONS.left.position),
-        { ...arr2Vec(POSITIONS.front.position), duration, ease }
+        arr2Vec(STATES.left.position),
+        { ...arr2Vec(STATES.front.position), duration, ease }
       );
       const tw2Rot = gsap.fromTo(
         panel2Ref.current.rotation,
-        arr2Vec(POSITIONS.left.rotation),
-        { ...arr2Vec(POSITIONS.front.rotation), duration, ease }
+        arr2Vec(STATES.left.rotation),
+        { ...arr2Vec(STATES.front.rotation), duration, ease }
       );
 
       tl2.add(tw2Rot, 0);
@@ -175,13 +189,13 @@ export const Covrflow = forwardRef<
 
       const tw3Pos = gsap.fromTo(
         panel3Ref.current.position,
-        arr2Vec(POSITIONS.front.position),
-        { ...arr2Vec(POSITIONS.right.position), duration, ease }
+        arr2Vec(STATES.front.position),
+        { ...arr2Vec(STATES.right.position), duration, ease }
       );
       const tw3Rot = gsap.fromTo(
         panel3Ref.current.rotation,
-        arr2Vec(POSITIONS.front.rotation),
-        { ...arr2Vec(POSITIONS.right.rotation), duration, ease }
+        arr2Vec(STATES.front.rotation),
+        { ...arr2Vec(STATES.right.rotation), duration, ease }
       );
 
       tl3.add(tw3Rot, 0);
@@ -195,19 +209,19 @@ export const Covrflow = forwardRef<
 
       const tw4Pos = gsap.fromTo(
         panel4Ref.current.position,
-        arr2Vec(POSITIONS.right.position),
-        { ...arr2Vec(POSITIONS.backright.position), duration, ease }
+        arr2Vec(STATES.right.position),
+        { ...arr2Vec(STATES.backright.position), duration, ease }
       );
       const tw4Rot = gsap.fromTo(
         panel4Ref.current.rotation,
-        arr2Vec(POSITIONS.right.rotation),
-        { ...arr2Vec(POSITIONS.backright.rotation), duration, ease }
+        arr2Vec(STATES.right.rotation),
+        { ...arr2Vec(STATES.backright.rotation), duration, ease }
       );
       const tw4Transparency = gsap.fromTo(
         panel4Ref.current.material,
-        { opacity: POSITIONS.right.opacity },
+        { opacity: STATES.right.opacity },
         {
-          opacity: POSITIONS.backright.opacity,
+          opacity: STATES.backright.opacity,
           duration,
           ease: "circ.in",
         }
@@ -249,14 +263,10 @@ export const Covrflow = forwardRef<
 
   return (
     <group position={[0, 2.5, 0]}>
-      <Panel ref={panel1Ref} position={POSITIONS.backleft.position} />
-      <Panel ref={panel2Ref} position={POSITIONS.left.position} />
-      <Panel ref={panel3Ref} position={POSITIONS.front.position} />
-      <Panel ref={panel4Ref} position={POSITIONS.right.position} />
-
-      <Panel position={POSITIONS.front.position}>
-        <meshStandardMaterial wireframe color="#aaa" />
-      </Panel>
+      <Panel ref={panel1Ref} state="backleft" debug />
+      <Panel ref={panel2Ref} state="left" debug />
+      <Panel ref={panel3Ref} state="front" debug />
+      <Panel ref={panel4Ref} state="right" debug />
     </group>
   );
 });
