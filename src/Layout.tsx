@@ -21,16 +21,16 @@ function Layout({
     Layout: folder(
       {
         bg,
-        grid: true,
-        axes: true,
+        grid: false,
+        axes: false,
       },
       { collapsed: true }
     ),
   }));
   // console.log("gui=", gui);
 
-  const spotLightRef = useRef(null);
-  useHelper(spotLightRef, SpotLightHelper, "yellow");
+  // const spotLightRef = useRef(null);
+  // useHelper(spotLightRef, SpotLightHelper, "yellow");
 
   return (
     <>
@@ -46,7 +46,7 @@ function Layout({
       </Environment>
 
       <spotLight
-        ref={spotLightRef}
+        // ref={spotLightRef}
         position={[15, 15, 15]}
         // angle={0.3}
         penumbra={2}
@@ -58,7 +58,7 @@ function Layout({
       />
       <ambientLight intensity={2} />
 
-      {/* {gui.grid && <gridHelper args={[30, 30, 30]} position-y=".01" />} */}
+      {gui.grid && <gridHelper args={[30, 30, 30]} position-y=".01" />}
       {gui.axes && <axesHelper args={[5]} />}
 
       {children}

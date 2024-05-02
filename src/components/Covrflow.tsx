@@ -7,12 +7,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { Box } from "@react-three/drei";
+import { Box, Center } from "@react-three/drei";
 import { useControls } from "leva";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { useDrag } from "@use-gesture/react";
-import { useSpring, animated } from "@react-spring/three";
+import { createUseGesture, dragAction, pinchAction } from "@use-gesture/react";
+import { animated } from "@react-spring/three";
+
+import { InertiaPlugin } from "gsap/InertiaPlugin";
+gsap.registerPlugin(InertiaPlugin);
+
+const useGesture = createUseGesture([dragAction, pinchAction]);
 
 const content = [
   "#ecfdf5",
@@ -110,9 +115,6 @@ const Panel = forwardRef<
     debugOnly?: boolean;
   }
 >(({ state, children, debug, debugOnly = false, ...props }, ref) => {
-  const defaultColor = "#ccc";
-  const [color, setColor] = useState(defaultColor);
-
   const posRot = {
     position: STATES[state].position,
     rotation: STATES[state].rotation,
@@ -125,97 +127,35 @@ const Panel = forwardRef<
       {!debugOnly && (
         <Box
           castShadow
-          receiveShadow
-          ref={ref}
           args={size}
+          ref={ref}
           {...posRot}
           {...props}
-          onPointerEnter={() => {
-            setColor("white");
-          }}
-          onPointerLeave={() => {
-            setColor(defaultColor);
-          }}
+          receiveShadow
         >
           {children || (
-            <meshStandardMaterial transparent opacity={1} color={color} />
+            <meshStandardMaterial transparent opacity={1} color="white" />
           )}
         </Box>
       )}
 
       {debug && (
         <Box args={size} {...posRot} {...props}>
-          <meshStandardMaterial
-            wireframe
-            color="#aaa"
-            // opacity={0.25}
-            // transparent
-          />
+          <meshStandardMaterial wireframe color="#aaa" />
         </Box>
       )}
     </>
   );
 });
 
-function Scroller({ setSeek }: { setSeek: (val: number) => void }) {
-  const defaultSpring = { mass: 1, tension: 800 };
-  const [springs, api] = useSpring(() => ({
-    position: [0, 0, 0],
-    config: {
-      mass: defaultSpring.mass,
-      friction: 40,
-      tension: defaultSpring.tension,
-    },
-    onChange: ({
-      value: {
-        position: [x, y, z],
-      },
-    }) => {
-      console.log(x);
-      setSeek(x);
-    },
-  }));
-  const bind = useDrag(({ event, movement: [mx], offset: [ox], down }) => {
-    event.stopPropagation();
-
-    const dx = (1 / 20) * mx;
-
-    api.start({
-      position: down ? [dx, 0, 0] : [0, 0, 0],
-      config: {
-        mass: down ? defaultSpring.mass : 4,
-        tension: down ? 2000 : defaultSpring.tension,
-      },
-    });
-  });
-
-  const r = 0.3;
-  return (
-    <>
-      <group position={[0, r, 10]}>
-        <animated.mesh
-          position={springs.position.to((x, y, z) => [x, y, z])}
-          {...(bind() as any)}
-          castShadow
-        >
-          <sphereGeometry args={[r, 64, 64]} />
-          <meshNormalMaterial />
-        </animated.mesh>
-      </group>
-    </>
-  );
-}
-
-//  ██████  ██████  ██    ██ ██████  ███████ ██       ██████  ██     ██
-// ██      ██    ██ ██    ██ ██   ██ ██      ██      ██    ██ ██     ██
-// ██      ██    ██ ██    ██ ██████  █████   ██      ██    ██ ██  █  ██
-// ██      ██    ██  ██  ██  ██   ██ ██      ██      ██    ██ ██ ███ ██
-//  ██████  ██████    ████   ██   ██ ██      ███████  ██████   ███ ███
-
 export const Covrflow = forwardRef<
   ElementRef<"group">,
   ComponentProps<"group">
 >((props, ref) => {
+  //
+  // Tweens
+  //
+
   const [tl] = useState(gsap.timeline({ paused: true }));
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
@@ -356,43 +296,98 @@ export const Covrflow = forwardRef<
   //
 
   const [gui, setGui] = useControls(() => ({
-    seek: {
+    pos: {
       value: 0,
-      min: -19.9,
-      max: 29.9,
+      // min: -19.9,
+      // max: 29.9,
       step: 0.001,
     },
     debug: true,
   }));
 
-  const seek = gui.seek;
-  const setSeek = useCallback((seek: number) => setGui({ seek }), [setGui]);
+  const pos = gui.pos;
+  const setPos = useCallback((pos: number) => setGui({ pos }), [setGui]);
 
   useEffect(() => {
-    tl.seek(adjustToTimeline(seek));
-  }, [tl, seek]);
+    tl.seek(adjustToTimeline(pos));
+  }, [tl, pos]);
 
   const debug = gui.debug;
   return (
     <>
       <group position={[0, 2.5 + 0.01, 0]}>
         <Panel ref={panel1Ref} state="backleft" debug={debug}>
-          <meshStandardMaterial color={circular(Math.floor(seek) - 0 + 2)} />
+          <meshStandardMaterial color={circular(Math.floor(pos) - 0 + 2)} />
         </Panel>
         <Panel ref={panel2Ref} state="left" debug={debug}>
-          <meshStandardMaterial color={circular(Math.floor(seek) - 1 + 2)} />
+          <meshStandardMaterial color={circular(Math.floor(pos) - 1 + 2)} />
         </Panel>
         <Panel ref={panel3Ref} state="front" debug={debug}>
-          <meshStandardMaterial color={circular(Math.floor(seek) - 2 + 2)} />
+          <meshStandardMaterial color={circular(Math.floor(pos) - 2 + 2)} />
         </Panel>
         <Panel ref={panel4Ref} state="right" debug={debug}>
-          <meshStandardMaterial color={circular(Math.floor(seek) - 3 + 2)} />
+          <meshStandardMaterial color={circular(Math.floor(pos) - 3 + 2)} />
         </Panel>
 
         <Panel state="backright" debug={debug} debugOnly />
       </group>
 
-      <Scroller setSeek={setSeek} />
+      <Seeker pos={pos} setPos={setPos} />
     </>
   );
 });
+
+// ███████ ███████ ███████ ██   ██ ███████ ██████
+// ██      ██      ██      ██  ██  ██      ██   ██
+// ███████ █████   █████   █████   █████   ██████
+//      ██ ██      ██      ██  ██  ██      ██   ██
+// ███████ ███████ ███████ ██   ██ ███████ ██   ██
+
+function Seeker({
+  pos,
+  setPos,
+  ...props
+}: ComponentProps<"mesh"> & { pos: number; setPos: (val: number) => void }) {
+  const SENSITIVITY = 1 / 50;
+  const VELOCITY_BOOSTER = 20;
+
+  const [offset] = useState({ x: 0 });
+  const twInertia = useRef<gsap.core.Tween>();
+
+  const bind = useGesture({
+    onDragStart() {
+      twInertia.current?.kill(); // cancel previous inertia tween if still active
+    },
+    onDrag({ movement: [mx] }) {
+      setPos(offset.x + mx * SENSITIVITY); // previous offset + mx
+    },
+    onDragEnd({ velocity: [vx], direction: [dx], movement: [mx] }) {
+      offset.x = pos; // update offset when dragging ends
+
+      twInertia.current = gsap.to(offset, {
+        inertia: {
+          x: {
+            velocity: (dx || Math.abs(mx) / mx) * vx * VELOCITY_BOOSTER,
+            end: gsap.utils.snap(1),
+          },
+        },
+        onUpdate() {
+          setPos(offset.x);
+        },
+      });
+    },
+  });
+
+  const a = 0.15;
+  return (
+    <animated.mesh
+      {...(bind() as any)}
+      {...props}
+      castShadow
+      receiveShadow
+      position={[0, a / 2, 12]}
+    >
+      <boxGeometry args={[2, a, a]} />
+    </animated.mesh>
+  );
+}
