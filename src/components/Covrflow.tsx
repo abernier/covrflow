@@ -355,6 +355,7 @@ function Seeker({
   const [offset] = useState({ x: 0 });
   const twInertia = useRef<gsap.core.Tween>();
 
+  // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
   const [springs, set] = useSpring(() => ({ position: [0, 0, 0] }));
 
   const bind = useGesture({
