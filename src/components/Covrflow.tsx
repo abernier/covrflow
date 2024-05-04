@@ -7,14 +7,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { Box, Center } from "@react-three/drei";
+import { Box } from "@react-three/drei";
 import { useControls } from "leva";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { createUseGesture, dragAction, pinchAction } from "@use-gesture/react";
-import { animated } from "@react-spring/three";
+import { animated, useSpring } from "@react-spring/three";
 
 import { InertiaPlugin } from "gsap/InertiaPlugin";
+
 gsap.registerPlugin(InertiaPlugin);
 
 const useGesture = createUseGesture([dragAction, pinchAction]);
@@ -354,12 +355,15 @@ function Seeker({
   const [offset] = useState({ x: 0 });
   const twInertia = useRef<gsap.core.Tween>();
 
+  const [springs, set] = useSpring(() => ({ position: [0, 0, 0] }));
+
   const bind = useGesture({
     onDragStart() {
       twInertia.current?.kill(); // cancel previous inertia tween if still active
     },
-    onDrag({ movement: [mx] }) {
+    onDrag({ movement: [mx], down }) {
       setPos(offset.x + mx * SENSITIVITY); // previous offset + mx
+      set({ position: down ? [mx / 200, 0] : [0, 0, 0] });
     },
     onDragEnd({ velocity: [vx], direction: [dx], movement: [mx] }) {
       offset.x = pos; // update offset when dragging ends
@@ -378,16 +382,22 @@ function Seeker({
     },
   });
 
-  const a = 0.15;
+  const cursorColor = { normal: "pink", hover: "hotpink" };
+  const [color, setColor] = useState(cursorColor.normal);
+
+  const a = 0.2;
   return (
     <animated.mesh
       {...(bind() as any)}
       {...props}
       castShadow
       receiveShadow
-      position={[0, a / 2, 12]}
+      position={springs.position.to((x, y, z) => [x, a / 2, 11])}
+      onPointerEnter={() => setColor(cursorColor.hover)}
+      onPointerLeave={() => setColor(cursorColor.normal)}
     >
-      <boxGeometry args={[2, a, a]} />
+      <boxGeometry args={[1.25 * a, a, a]} />
+      <meshStandardMaterial color={color} />
     </animated.mesh>
   );
 }
