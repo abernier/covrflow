@@ -426,7 +426,7 @@ function Seeker({
   const cursorColor = { normal: "pink", hover: "hotpink" };
   const [color, setColor] = useState(cursorColor.normal);
 
-  const a = 0.2;
+  const a = 0.35;
   return (
     <animated.mesh
       {...(bind() as any)}
