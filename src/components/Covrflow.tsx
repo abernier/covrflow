@@ -14,7 +14,7 @@ import { useGSAP } from "@gsap/react";
 import { createUseGesture, dragAction, pinchAction } from "@use-gesture/react";
 import { animated, useSpring } from "@react-spring/three";
 
-import { InertiaPlugin } from "gsap/InertiaPlugin";
+import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -46,15 +46,18 @@ function arr2vec(arr: [number, number, number]) {
   return { x, y, z };
 }
 
-function adjustToTimeline(x: number) {
-  //
-  // Fonction pour ajuster x dans l'intervalle [0, 1]
+function mod(x: number, n = 1) {
   //
   // https://chat.openai.com/share/743ba98b-a8b0-488b-af0c-0aac705233d3
   //
+  // mod(.8) => .8
+  // mod(4.3) => .3
+  // mod(-0.7) => .3
+  // mod(-9.6) => .4
+  //
 
-  x = x % 1; // Utilisation du modulo pour limiter x entre -1 et 1
-  if (x < 0) x += 1; // Ajustement pour que x soit toujours positif
+  x = x % n; // limit between -1 and 1
+  if (x < 0) x += n; // for x to be always positive
   return x;
 }
 
@@ -297,20 +300,15 @@ export const Covrflow = forwardRef<
   //
 
   const [gui, setGui] = useControls(() => ({
-    pos: {
-      value: 0,
-      // min: -19.9,
-      // max: 29.9,
-      step: 0.001,
-    },
-    debug: true,
+    pos: 0,
+    debug: false,
   }));
 
   const pos = gui.pos;
   const setPos = useCallback((pos: number) => setGui({ pos }), [setGui]);
 
   useEffect(() => {
-    tl.seek(adjustToTimeline(pos));
+    tl.seek(mod(pos));
   }, [tl, pos]);
 
   const debug = gui.debug;
@@ -333,7 +331,7 @@ export const Covrflow = forwardRef<
         <Panel state="backright" debug={debug} debugOnly />
       </group>
 
-      <Seeker pos={pos} setPos={setPos} />
+      <Seeker setPos={setPos} />
     </>
   );
 });
@@ -345,36 +343,42 @@ export const Covrflow = forwardRef<
 // ███████ ███████ ███████ ██   ██ ███████ ██   ██
 
 function Seeker({
-  pos,
   setPos,
   ...props
-}: ComponentProps<"mesh"> & { pos: number; setPos: (val: number) => void }) {
-  const SENSITIVITY = 1 / 50;
-  const VELOCITY_BOOSTER = 20;
-
+}: ComponentProps<"mesh"> & {
+  setPos: (val: number) => void;
+}) {
   const [offset] = useState({ x: 0 });
+  const [pos] = useState({ x: 0 });
+  const tracker = VelocityTracker.track(pos, "x")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+
   const twInertia = useRef<gsap.core.Tween>();
 
   // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
-  const [springs, set] = useSpring(() => ({ position: [0, 0, 0] }));
+  const [springs, api] = useSpring(() => ({ position: [0, 0, 0] }));
 
   const bind = useGesture({
     onDragStart() {
       twInertia.current?.kill(); // cancel previous inertia tween if still active
     },
     onDrag({ movement: [mx], down }) {
-      setPos(offset.x + mx * SENSITIVITY); // previous offset + mx
-      set({ position: down ? [mx / 200, 0] : [0, 0, 0] });
-    },
-    onDragEnd({ velocity: [vx], direction: [dx], movement: [mx] }) {
-      offset.x = pos; // update offset when dragging ends
+      api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
 
+      const SENSITIVITY = 1 / 50;
+      pos.x = offset.x + mx * SENSITIVITY;
+      setPos(pos.x);
+    },
+    onDragEnd() {
+      offset.x = pos.x; // update offset when dragging ends
+
+      // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
       twInertia.current = gsap.to(offset, {
         inertia: {
           x: {
-            velocity: (dx || Math.abs(mx) / mx) * vx * VELOCITY_BOOSTER,
+            velocity: tracker.get("x"),
             end: gsap.utils.snap(1),
           },
+          duration: { min: 0.5, max: 1.5 },
         },
         onUpdate() {
           setPos(offset.x);
