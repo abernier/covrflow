@@ -167,133 +167,130 @@ export const Covrflow = forwardRef<
   const panel3Ref = useRef<ElementRef<typeof Box>>(null);
   const panel4Ref = useRef<ElementRef<typeof Box>>(null);
 
-  useGSAP(
-    () => {
-      if (
-        !panel1Ref.current ||
-        !panel2Ref.current ||
-        !panel3Ref.current ||
-        !panel4Ref.current
-      )
-        return;
+  const { contextSafe } = useGSAP(() => {
+    if (
+      !panel1Ref.current ||
+      !panel2Ref.current ||
+      !panel3Ref.current ||
+      !panel4Ref.current
+    )
+      return;
 
-      const duration = 1;
-      const ease = "none";
+    const duration = 1;
+    const ease = "none";
 
-      //
-      // 1: backleft -> left
-      //
+    //
+    // 1: backleft -> left
+    //
 
-      const tl1 = gsap.timeline();
+    const tl1 = gsap.timeline();
 
-      const tw1Pos = gsap.fromTo(
-        panel1Ref.current.position,
-        arr2vec(STATES.backleft.position),
-        { ...arr2vec(STATES.left.position), duration, ease }
-      );
-      const tw1Rot = gsap.fromTo(
-        panel1Ref.current.rotation,
-        arr2vec(STATES.backleft.rotation),
-        { ...arr2vec(STATES.left.rotation), duration, ease }
-      );
-      const tw1Transparency = gsap.fromTo(
-        panel1Ref.current.material,
-        { opacity: STATES.backleft.opacity, transparent: true },
-        {
-          opacity: STATES.left.opacity,
-          transparent: true,
-          duration,
-          // ease: "circ.in",
-        }
-      );
+    const tw1Pos = gsap.fromTo(
+      panel1Ref.current.position,
+      arr2vec(STATES.backleft.position),
+      { ...arr2vec(STATES.left.position), duration, ease }
+    );
+    const tw1Rot = gsap.fromTo(
+      panel1Ref.current.rotation,
+      arr2vec(STATES.backleft.rotation),
+      { ...arr2vec(STATES.left.rotation), duration, ease }
+    );
+    const tw1Transparency = gsap.fromTo(
+      panel1Ref.current.material,
+      { opacity: STATES.backleft.opacity, transparent: true },
+      {
+        opacity: STATES.left.opacity,
+        transparent: true,
+        duration,
+        // ease: "circ.in",
+      }
+    );
 
-      tl1.add(tw1Rot, 0);
-      tl1.add(tw1Pos, 0);
-      tl1.add(tw1Transparency, 0);
+    tl1.add(tw1Rot, 0);
+    tl1.add(tw1Pos, 0);
+    tl1.add(tw1Transparency, 0);
 
-      //
-      // 2: left -> front
-      //
+    //
+    // 2: left -> front
+    //
 
-      const tl2 = gsap.timeline();
+    const tl2 = gsap.timeline();
 
-      const tw2Pos = gsap.fromTo(
-        panel2Ref.current.position,
-        arr2vec(STATES.left.position),
-        { ...arr2vec(STATES.front.position), duration, ease }
-      );
-      const tw2Rot = gsap.fromTo(
-        panel2Ref.current.rotation,
-        arr2vec(STATES.left.rotation),
-        { ...arr2vec(STATES.front.rotation), duration, ease }
-      );
+    const tw2Pos = gsap.fromTo(
+      panel2Ref.current.position,
+      arr2vec(STATES.left.position),
+      { ...arr2vec(STATES.front.position), duration, ease }
+    );
+    const tw2Rot = gsap.fromTo(
+      panel2Ref.current.rotation,
+      arr2vec(STATES.left.rotation),
+      { ...arr2vec(STATES.front.rotation), duration, ease }
+    );
 
-      tl2.add(tw2Rot, 0);
-      tl2.add(tw2Pos, 0);
+    tl2.add(tw2Rot, 0);
+    tl2.add(tw2Pos, 0);
 
-      //
-      // 3: front -> right
-      //
+    //
+    // 3: front -> right
+    //
 
-      const tl3 = gsap.timeline();
+    const tl3 = gsap.timeline();
 
-      const tw3Pos = gsap.fromTo(
-        panel3Ref.current.position,
-        arr2vec(STATES.front.position),
-        { ...arr2vec(STATES.right.position), duration, ease }
-      );
-      const tw3Rot = gsap.fromTo(
-        panel3Ref.current.rotation,
-        arr2vec(STATES.front.rotation),
-        { ...arr2vec(STATES.right.rotation), duration, ease }
-      );
+    const tw3Pos = gsap.fromTo(
+      panel3Ref.current.position,
+      arr2vec(STATES.front.position),
+      { ...arr2vec(STATES.right.position), duration, ease }
+    );
+    const tw3Rot = gsap.fromTo(
+      panel3Ref.current.rotation,
+      arr2vec(STATES.front.rotation),
+      { ...arr2vec(STATES.right.rotation), duration, ease }
+    );
 
-      tl3.add(tw3Rot, 0);
-      tl3.add(tw3Pos, 0);
+    tl3.add(tw3Rot, 0);
+    tl3.add(tw3Pos, 0);
 
-      //
-      // 4: right -> backright
-      //
+    //
+    // 4: right -> backright
+    //
 
-      const tl4 = gsap.timeline();
+    const tl4 = gsap.timeline();
 
-      const tw4Pos = gsap.fromTo(
-        panel4Ref.current.position,
-        arr2vec(STATES.right.position),
-        { ...arr2vec(STATES.backright.position), duration, ease }
-      );
-      const tw4Rot = gsap.fromTo(
-        panel4Ref.current.rotation,
-        arr2vec(STATES.right.rotation),
-        { ...arr2vec(STATES.backright.rotation), duration, ease }
-      );
-      const tw4Transparency = gsap.fromTo(
-        panel4Ref.current.material,
-        { opacity: STATES.right.opacity, transparent: true },
-        {
-          opacity: STATES.backright.opacity,
-          transparent: true,
-          duration,
-          // ease: "circ.in",
-        }
-      );
+    const tw4Pos = gsap.fromTo(
+      panel4Ref.current.position,
+      arr2vec(STATES.right.position),
+      { ...arr2vec(STATES.backright.position), duration, ease }
+    );
+    const tw4Rot = gsap.fromTo(
+      panel4Ref.current.rotation,
+      arr2vec(STATES.right.rotation),
+      { ...arr2vec(STATES.backright.rotation), duration, ease }
+    );
+    const tw4Transparency = gsap.fromTo(
+      panel4Ref.current.material,
+      { opacity: STATES.right.opacity, transparent: true },
+      {
+        opacity: STATES.backright.opacity,
+        transparent: true,
+        duration,
+        // ease: "circ.in",
+      }
+    );
 
-      tl4.add(tw4Rot, 0);
-      tl4.add(tw4Pos, 0);
-      tl4.add(tw4Transparency, 0);
+    tl4.add(tw4Rot, 0);
+    tl4.add(tw4Pos, 0);
+    tl4.add(tw4Transparency, 0);
 
-      //
-      // all
-      //
+    //
+    // all
+    //
 
-      tl.clear();
-      tl.add(tl1, 0);
-      tl.add(tl2, 0);
-      tl.add(tl3, 0);
-      tl.add(tl4, 0);
-    },
-    { dependencies: [tl] }
-  );
+    tl.clear();
+    tl.add(tl1, 0);
+    tl.add(tl2, 0);
+    tl.add(tl3, 0);
+    tl.add(tl4, 0);
+  });
 
   //
   // GUI
@@ -308,8 +305,35 @@ export const Covrflow = forwardRef<
   const setPos = useCallback((pos: number) => setGui({ pos }), [setGui]);
 
   useEffect(() => {
-    tl.seek(mod(pos));
+    tl.seek(mod(pos)); // seek [0..1] once `pos` changes
   }, [tl, pos]);
+
+  //
+  // prev/next
+  //
+
+  // const twPrevNext = useRef<gsap.core.Tween>();
+
+  // const prevNextHandler = useCallback(
+  //   (direction: "next" | "prev") => {
+  //     const dir = direction === "prev" ? -1 : 1;
+
+  //     return contextSafe(() => {
+  //       twPrevNext.current?.kill();
+
+  //       const o = { val: gui.pos };
+  //       twPrevNext.current = gsap.to(o, {
+  //         val: Math.floor(gui.pos) + 1 * dir,
+  //         onUpdate: () => setPos(o.val),
+  //       });
+  //     });
+  //   },
+  //   [contextSafe, gui.pos, setPos]
+  // );
+
+  //
+  //
+  //
 
   const debug = gui.debug;
   return (
@@ -318,13 +342,23 @@ export const Covrflow = forwardRef<
         <Panel ref={panel1Ref} state="backleft" debug={debug}>
           <meshStandardMaterial color={circular(Math.floor(pos) - 0 + 2)} />
         </Panel>
-        <Panel ref={panel2Ref} state="left" debug={debug}>
+        <Panel
+          ref={panel2Ref}
+          state="left"
+          debug={debug}
+          // onPointerUp={prevNextHandler("prev")}
+        >
           <meshStandardMaterial color={circular(Math.floor(pos) - 1 + 2)} />
         </Panel>
         <Panel ref={panel3Ref} state="front" debug={debug}>
           <meshStandardMaterial color={circular(Math.floor(pos) - 2 + 2)} />
         </Panel>
-        <Panel ref={panel4Ref} state="right" debug={debug}>
+        <Panel
+          ref={panel4Ref}
+          state="right"
+          debug={debug}
+          // onPointerUp={prevNextHandler("next")}
+        >
           <meshStandardMaterial color={circular(Math.floor(pos) - 3 + 2)} />
         </Panel>
 
@@ -368,7 +402,9 @@ function Seeker({
       pos.x = offset.x + mx * SENSITIVITY;
       setPos(pos.x);
     },
-    onDragEnd() {
+    onDragEnd({ movement: [mx] }) {
+      if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
+
       offset.x = pos.x; // update offset when dragging ends
 
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
