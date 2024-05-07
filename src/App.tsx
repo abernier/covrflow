@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { XR, Controllers, Hands, VRButton } from "@react-three/xr";
+import { XR, Controllers, Hands, XRButton, VRButton } from "@react-three/xr";
 
 import Layout from "./Layout";
 import Ground from "./components/Ground";
