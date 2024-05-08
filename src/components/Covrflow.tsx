@@ -388,9 +388,9 @@ function Seeker({
 }: ComponentProps<"mesh"> & {
   setPos: (val: number) => void;
 }) {
-  const [offset] = useState({ x: 0 });
-  const [pos] = useState({ x: 0 });
-  const tracker = VelocityTracker.track(pos, "x")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+  const [total] = useState({ x: 0 });
+  const [current] = useState({ x: 0 });
+  const tracker = VelocityTracker.track(current, "x")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
 
   const twInertia = useRef<gsap.core.Tween>();
 
@@ -405,16 +405,16 @@ function Seeker({
       api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
 
       const SENSITIVITY = 1 / 50;
-      pos.x = offset.x + mx * SENSITIVITY;
-      setPos(pos.x);
+      current.x = total.x + mx * SENSITIVITY;
+      setPos(current.x);
     },
     onDragEnd({ movement: [mx] }) {
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
-      offset.x = pos.x; // update offset when dragging ends
+      total.x = current.x; // update offset when dragging ends
 
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-      twInertia.current = gsap.to(offset, {
+      twInertia.current = gsap.to(total, {
         inertia: {
           x: {
             velocity: tracker.get("x"),
@@ -423,7 +423,7 @@ function Seeker({
           duration: { min: 0.5, max: 1.5 },
         },
         onUpdate() {
-          setPos(offset.x);
+          setPos(total.x);
         },
       });
     },
