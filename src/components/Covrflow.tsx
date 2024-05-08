@@ -382,33 +382,49 @@ const Panel = forwardRef<
 //      ██ ██      ██      ██  ██  ██      ██   ██
 // ███████ ███████ ███████ ██   ██ ███████ ██   ██
 
-function Seeker({
-  onUpdate,
-  ...props
-}: Omit<ComponentProps<"mesh">, "onUpdate"> & {
-  onUpdate?: (val: number) => void;
-}) {
+function useInertiaDrag({
+  sensitivity = 1 / 50,
+  onDragStart,
+  onDrag,
+  onDragEnd,
+}: {
+  sensitivity?: number;
+  onDragStart?: Parameters<typeof useGesture>[0]["onDragStart"];
+  onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
+  onDragEnd?: Parameters<typeof useGesture>[0]["onDragEnd"];
+} = {}) {
   const [total] = useState({ x: 0 });
   const [current] = useState({ x: 0 });
   const tracker = VelocityTracker.track(current, "x")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
 
   const twInertia = useRef<gsap.core.Tween>();
 
-  // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
-  const [springs, api] = useSpring(() => ({ position: [0, 0, 0] }));
+  // Final value
+  const [value, setValue] = useState(0);
 
   const bind = useGesture({
-    onDragStart() {
+    onDragStart(...args) {
+      onDragStart?.(...args);
+
       twInertia.current?.kill(); // cancel previous inertia tween if still active
     },
-    onDrag({ movement: [mx], down }) {
-      api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
+    onDrag(...args) {
+      onDrag?.(...args);
 
-      const SENSITIVITY = 1 / 50;
-      current.x = total.x + mx * SENSITIVITY;
-      onUpdate?.(current.x);
+      const {
+        movement: [mx],
+      } = args[0];
+
+      current.x = total.x + mx * sensitivity;
+      setValue(current.x);
     },
-    onDragEnd({ movement: [mx] }) {
+    onDragEnd(...args) {
+      onDragEnd?.(...args);
+
+      const {
+        movement: [mx],
+      } = args[0];
+
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
       total.x = current.x; // update offset when dragging ends
@@ -423,11 +439,33 @@ function Seeker({
           duration: { min: 0.5, max: 1.5 },
         },
         onUpdate() {
-          onUpdate?.(total.x);
+          setValue(total.x);
         },
       });
     },
   });
+
+  return { bind, value };
+}
+
+function Seeker({
+  onUpdate,
+  ...props
+}: Omit<ComponentProps<"mesh">, "onUpdate"> & {
+  onUpdate?: (val: number) => void;
+}) {
+  // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
+  const [springs, api] = useSpring(() => ({ position: [0, 0, 0] }));
+
+  const { bind, value } = useInertiaDrag({
+    onDrag: ({ down, movement: [mx] }) => {
+      api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
+    },
+  });
+
+  useEffect(() => {
+    onUpdate?.(value);
+  }, [onUpdate, value]);
 
   const cursorColor = { normal: "#f472b6", hover: "#ec4899" };
   const [color, setColor] = useState(cursorColor.normal);
