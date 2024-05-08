@@ -423,10 +423,10 @@ function Seeker({
     },
   });
 
-  const cursorColor = { normal: "pink", hover: "hotpink" };
+  const cursorColor = { normal: "#c084fc", hover: "#8b5cf6" };
   const [color, setColor] = useState(cursorColor.normal);
 
-  const a = 0.35;
+  const a = 0.25;
   return (
     <animated.mesh
       {...(bind() as any)}
@@ -437,7 +437,8 @@ function Seeker({
       onPointerEnter={() => setColor(cursorColor.hover)}
       onPointerLeave={() => setColor(cursorColor.normal)}
     >
-      <boxGeometry args={[1.25 * a, a, a]} />
+      {/* <boxGeometry args={[1.25 * a, a, a]} /> */}
+      <sphereGeometry args={[a / 2, 64, 64]} />
       <meshStandardMaterial color={color} />
     </animated.mesh>
   );
