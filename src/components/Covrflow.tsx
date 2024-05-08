@@ -1,11 +1,17 @@
 import {
   ComponentProps,
   ElementRef,
+  MutableRefObject,
+  ReactNode,
+  createContext,
   forwardRef,
   useCallback,
+  useContext,
   useEffect,
   useRef,
   useState,
+  Dispatch,
+  SetStateAction,
 } from "react";
 import { Box } from "@react-three/drei";
 import { useControls } from "leva";
@@ -13,26 +19,15 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { createUseGesture, dragAction, pinchAction } from "@use-gesture/react";
 import { animated, useSpring } from "@react-spring/three";
-
 import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
 
 gsap.registerPlugin(InertiaPlugin);
 
 const useGesture = createUseGesture([dragAction, pinchAction]);
 
-const content = [
-  "#ecfdf5",
-  "#d1fae5",
-  "#a7f3d0",
-  "#6ee7b7",
-  "#34d399",
-  "#10b981",
-  "#059669",
-  "#047857",
-  "#065f46",
-  "#064e3b",
-  "#022c22",
-].reverse();
+//
+// Utilities
+//
 
 function circular(i: number) {
   return content.at(
@@ -61,8 +56,47 @@ function mod(x: number, n = 1) {
   return x;
 }
 
-const r = 5;
+const createRequiredContext = <T,>() => {
+  //
+  // Create a strongly typed context and a hook
+  //
+  // see: https://www.totaltypescript.com/workshops/advanced-react-with-typescript/advanced-hooks/strongly-typing-react-context/solution
+  //
 
+  const Ctx = createContext<T | null>(null);
+
+  const useCtx = () => {
+    const contextValue = useContext(Ctx);
+
+    if (contextValue === null) {
+      throw new Error("Context value is null");
+    }
+
+    return contextValue;
+  };
+
+  return [useCtx, Ctx.Provider] as const;
+};
+
+//
+// Constants
+//
+
+const content = [
+  "#ecfdf5",
+  "#d1fae5",
+  "#a7f3d0",
+  "#6ee7b7",
+  "#34d399",
+  "#10b981",
+  "#059669",
+  "#047857",
+  "#065f46",
+  "#064e3b",
+  "#022c22",
+].reverse();
+
+const r = 5;
 const STATES = {
   backleft: {
     position: [
@@ -111,10 +145,98 @@ const STATES = {
 // ██      ██    ██  ██  ██  ██   ██ ██      ██      ██    ██ ██ ███ ██
 //  ██████  ██████    ████   ██   ██ ██      ███████  ██████   ███ ███
 
-export const Covrflow = forwardRef<
-  ElementRef<"group">,
-  ComponentProps<"group">
->((props, ref) => {
+export function Covrflow() {
+  return (
+    <Inertia>
+      <Panels />
+    </Inertia>
+  );
+}
+
+// ██ ███    ██ ███████ ██████  ████████ ██  █████
+// ██ ████   ██ ██      ██   ██    ██    ██ ██   ██
+// ██ ██ ██  ██ █████   ██████     ██    ██ ███████
+// ██ ██  ██ ██ ██      ██   ██    ██    ██ ██   ██
+// ██ ██   ████ ███████ ██   ██    ██    ██ ██   ██
+
+const [useInertia, InertiaProvider] = createRequiredContext<{
+  total: MutableRefObject<number>;
+  obj: MutableRefObject<number>;
+  twInertia: MutableRefObject<gsap.core.Tween | undefined>;
+  state: [number, Dispatch<SetStateAction<number>>];
+}>();
+
+export function Inertia({ ...props }) {
+  const total = useRef(0);
+  const obj = useRef(0);
+  const twInertia = useRef<gsap.core.Tween>();
+
+  const state = useState(0);
+
+  return (
+    <InertiaProvider value={{ total, obj, twInertia, state }} {...props} />
+  );
+}
+
+function useInertiaDrag({
+  sensitivity = 1 / 50,
+  onDrag,
+  duration = { min: 0.5, max: 1.5 },
+}: {
+  sensitivity?: number;
+  onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
+  duration?: gsap.InertiaDuration;
+} = {}) {
+  const { total, obj, twInertia, state } = useInertia();
+  const [, set] = state; // Final value
+
+  const tracker = VelocityTracker.track(obj, "current")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+
+  const bind = useGesture({
+    onDragStart() {
+      twInertia.current?.kill(); // cancel previous inertia tween if still active
+    },
+    onDrag(...args) {
+      onDrag?.(...args); // callback
+
+      const {
+        movement: [mx],
+      } = args[0];
+
+      obj.current = total.current + mx * sensitivity;
+      set(obj.current);
+    },
+    onDragEnd({ movement: [mx] }) {
+      if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
+
+      total.current = obj.current; // update `total` when dragging ends
+
+      // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
+      twInertia.current = gsap.to(total, {
+        inertia: {
+          current: {
+            velocity: tracker.get("current"),
+            end: gsap.utils.snap(1),
+          },
+          duration,
+        },
+        onUpdate() {
+          set(total.current);
+        },
+      });
+    },
+  });
+
+  return { bind };
+}
+
+// ██████   █████  ███    ██ ███████ ██      ███████
+// ██   ██ ██   ██ ████   ██ ██      ██      ██
+// ██████  ███████ ██ ██  ██ █████   ██      ███████
+// ██      ██   ██ ██  ██ ██ ██      ██           ██
+// ██      ██   ██ ██   ████ ███████ ███████ ███████
+
+function Panels() {
   //
   // Tweens
   //
@@ -294,40 +416,52 @@ export const Covrflow = forwardRef<
   //
   //
 
+  const {
+    state: [value],
+  } = useInertia();
+
+  useEffect(() => {
+    setPos(value);
+  }, [setPos, value]);
+
   const debug = gui.debug;
+
+  const size: [number, number, number] = [3, 5, 0.1];
   return (
     <>
-      <group position={[0, 2.5 + 0.01, 0]}>
-        <Panel ref={panel1Ref} state="backleft" debug={debug}>
+      <group position={[0, size[1] / 2 + 0.01, 0]}>
+        <Panel ref={panel1Ref} state="backleft" debug={debug} size={size}>
           <meshStandardMaterial color={circular(Math.floor(pos) - 0 + 2)} />
         </Panel>
         <Panel
           ref={panel2Ref}
           state="left"
           debug={debug}
+          size={size}
           // onPointerUp={prevNextHandler("prev")}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 1 + 2)} />
         </Panel>
-        <Panel ref={panel3Ref} state="front" debug={debug}>
+        <Panel ref={panel3Ref} state="front" debug={debug} size={size}>
           <meshStandardMaterial color={circular(Math.floor(pos) - 2 + 2)} />
         </Panel>
         <Panel
           ref={panel4Ref}
           state="right"
           debug={debug}
+          size={size}
           // onPointerUp={prevNextHandler("next")}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 3 + 2)} />
         </Panel>
 
-        <Panel state="backright" debug={debug} debugOnly />
+        <Panel state="backright" debug={debug} debugOnly size={size} />
       </group>
 
-      <Seeker onUpdate={setPos} />
+      {debug && <Seeker />}
     </>
   );
-});
+}
 
 // ██████   █████  ███    ██ ███████ ██
 // ██   ██ ██   ██ ████   ██ ██      ██
@@ -341,40 +475,47 @@ const Panel = forwardRef<
     state: keyof typeof STATES;
     debug?: boolean;
     debugOnly?: boolean;
+    size?: [number, number, number];
   }
->(({ state, children, debug, debugOnly = false, ...props }, ref) => {
-  const posRot = {
-    position: STATES[state].position,
-    rotation: STATES[state].rotation,
-  };
+>(
+  (
+    { state, children, debug, debugOnly = false, size = [3, 5, 0.1], ...props },
+    ref
+  ) => {
+    const posRot = {
+      position: STATES[state].position,
+      rotation: STATES[state].rotation,
+    };
 
-  const size: [number, number, number] = [3, 5, 0.1];
+    const { bind } = useInertiaDrag();
 
-  return (
-    <>
-      {!debugOnly && (
-        <Box
-          castShadow
-          args={size}
-          ref={ref}
-          {...posRot}
-          {...props}
-          receiveShadow
-        >
-          {children || (
-            <meshStandardMaterial transparent opacity={1} color="white" />
-          )}
-        </Box>
-      )}
+    return (
+      <>
+        {!debugOnly && (
+          <Box
+            args={size}
+            ref={ref}
+            castShadow
+            receiveShadow
+            {...posRot}
+            {...props}
+            {...(bind() as any)}
+          >
+            {children || (
+              <meshStandardMaterial transparent opacity={1} color="white" />
+            )}
+          </Box>
+        )}
 
-      {debug && (
-        <Box args={size} {...posRot} {...props}>
-          <meshStandardMaterial wireframe color="#aaa" />
-        </Box>
-      )}
-    </>
-  );
-});
+        {debug && (
+          <Box args={size} {...posRot} {...props}>
+            <meshStandardMaterial wireframe color="#aaa" />
+          </Box>
+        )}
+      </>
+    );
+  }
+);
 
 // ███████ ███████ ███████ ██   ██ ███████ ██████
 // ██      ██      ██      ██  ██  ██      ██   ██
@@ -382,121 +523,31 @@ const Panel = forwardRef<
 //      ██ ██      ██      ██  ██  ██      ██   ██
 // ███████ ███████ ███████ ██   ██ ███████ ██   ██
 
-function useDragInertia({
-  sensitivity = 1 / 50,
-  onDrag,
-}: {
-  sensitivity?: number;
-  onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
-} = {}) {
-  const [total] = useState({ x: 0 });
-  const [current] = useState({ x: 0 });
-  const tracker = VelocityTracker.track(current, "x")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
-
-  const twInertia = useRef<gsap.core.Tween>();
-
-  // Final value
-  const [value, setValue] = useState(0);
-
-  const bind = useGesture({
-    onDragStart(...args) {
-      twInertia.current?.kill(); // cancel previous inertia tween if still active
-    },
-    onDrag(...args) {
-      onDrag?.(...args); // callback
-
-      const {
-        movement: [mx],
-      } = args[0];
-
-      current.x = total.x + mx * sensitivity;
-      setValue(current.x);
-    },
-    onDragEnd({ movement: [mx] }) {
-      if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
-
-      total.x = current.x; // update offset when dragging ends
-
-      // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-      twInertia.current = gsap.to(total, {
-        inertia: {
-          x: {
-            velocity: tracker.get("x"),
-            end: gsap.utils.snap(1),
-          },
-          duration: { min: 0.5, max: 1.5 },
-        },
-        onUpdate() {
-          setValue(total.x);
-        },
-      });
-    },
-  });
-
-  return { bind, value };
-}
-
-function Seeker({
-  onUpdate,
-  ...props
-}: Omit<ComponentProps<"mesh">, "onUpdate"> & {
-  onUpdate?: (val: number) => void;
-}) {
-  const [springs1, api1] = useSpring(() => ({ position: [0, 0, 0] })); // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
-  const { bind: bind1, value: value1 } = useDragInertia({
+function Seeker({ ...props }: ComponentProps<"mesh"> & {}) {
+  const [springs, api] = useSpring(() => ({ position: [0, 0, 0] })); // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
+  const { bind } = useInertiaDrag({
     onDrag: ({ down, movement: [mx] }) => {
-      api1.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
+      api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
     },
   });
-  useEffect(() => {
-    onUpdate?.(value1);
-  }, [onUpdate, value1]);
-
-  const [springs2, api2] = useSpring(() => ({ position: [0, 0, 0] })); // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
-  const { bind: bind2, value: value2 } = useDragInertia({
-    onDrag: ({ down, movement: [mx] }) => {
-      api2.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
-    },
-  });
-  useEffect(() => {
-    onUpdate?.(value2);
-  }, [onUpdate, value2]);
 
   const cursorColor1 = { normal: "#f472b6", hover: "#ec4899" };
   const [color1, setColor1] = useState(cursorColor1.normal);
 
-  const cursorColor2 = { normal: "#c084fc", hover: "#a855f7" };
-  const [color2, setColor2] = useState(cursorColor2.normal);
   const a = 0.25;
   return (
-    <>
-      <animated.mesh
-        {...(bind1() as any)}
-        {...props}
-        castShadow
-        receiveShadow
-        position={springs1.position.to((x, y, z) => [x, a / 2, 11])}
-        onPointerEnter={() => setColor1(cursorColor1.hover)}
-        onPointerLeave={() => setColor1(cursorColor1.normal)}
-      >
-        {/* <boxGeometry args={[1.25 * a, a, a]} /> */}
-        <sphereGeometry args={[a / 2, 64, 64]} />
-        <meshStandardMaterial color={color1} />
-      </animated.mesh>
-
-      <animated.mesh
-        {...(bind2() as any)}
-        {...props}
-        castShadow
-        receiveShadow
-        position={springs2.position.to((x, y, z) => [x, a / 2, 12])}
-        onPointerEnter={() => setColor2(cursorColor2.hover)}
-        onPointerLeave={() => setColor2(cursorColor2.normal)}
-      >
-        {/* <boxGeometry args={[1.25 * a, a, a]} /> */}
-        <sphereGeometry args={[a / 2, 64, 64]} />
-        <meshStandardMaterial color={color2} />
-      </animated.mesh>
-    </>
+    <animated.mesh
+      {...(bind() as any)}
+      {...props}
+      castShadow
+      receiveShadow
+      position={springs.position.to((x, y, z) => [x, a / 2, 11])}
+      onPointerEnter={() => setColor1(cursorColor1.hover)}
+      onPointerLeave={() => setColor1(cursorColor1.normal)}
+    >
+      {/* <boxGeometry args={[1.25 * a, a, a]} /> */}
+      <sphereGeometry args={[a / 2, 64, 64]} />
+      <meshStandardMaterial color={color1} />
+    </animated.mesh>
   );
 }
