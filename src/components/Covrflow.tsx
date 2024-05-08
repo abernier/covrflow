@@ -386,7 +386,7 @@ function Seeker({
   onUpdate,
   ...props
 }: Omit<ComponentProps<"mesh">, "onUpdate"> & {
-  onUpdate: (val: number) => void;
+  onUpdate?: (val: number) => void;
 }) {
   const [total] = useState({ x: 0 });
   const [current] = useState({ x: 0 });
@@ -406,7 +406,7 @@ function Seeker({
 
       const SENSITIVITY = 1 / 50;
       current.x = total.x + mx * SENSITIVITY;
-      onUpdate(current.x);
+      onUpdate?.(current.x);
     },
     onDragEnd({ movement: [mx] }) {
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
@@ -423,7 +423,7 @@ function Seeker({
           duration: { min: 0.5, max: 1.5 },
         },
         onUpdate() {
-          onUpdate(total.x);
+          onUpdate?.(total.x);
         },
       });
     },
