@@ -105,52 +105,11 @@ const STATES = {
   };
 };
 
-// ██████   █████  ███    ██ ███████ ██
-// ██   ██ ██   ██ ████   ██ ██      ██
-// ██████  ███████ ██ ██  ██ █████   ██
-// ██      ██   ██ ██  ██ ██ ██      ██
-// ██      ██   ██ ██   ████ ███████ ███████
-
-const Panel = forwardRef<
-  ElementRef<typeof Box>,
-  ComponentProps<typeof Box> & {
-    state: keyof typeof STATES;
-    debug?: boolean;
-    debugOnly?: boolean;
-  }
->(({ state, children, debug, debugOnly = false, ...props }, ref) => {
-  const posRot = {
-    position: STATES[state].position,
-    rotation: STATES[state].rotation,
-  };
-
-  const size: [number, number, number] = [3, 5, 0.1];
-
-  return (
-    <>
-      {!debugOnly && (
-        <Box
-          castShadow
-          args={size}
-          ref={ref}
-          {...posRot}
-          {...props}
-          receiveShadow
-        >
-          {children || (
-            <meshStandardMaterial transparent opacity={1} color="white" />
-          )}
-        </Box>
-      )}
-
-      {debug && (
-        <Box args={size} {...posRot} {...props}>
-          <meshStandardMaterial wireframe color="#aaa" />
-        </Box>
-      )}
-    </>
-  );
-});
+//  ██████  ██████  ██    ██ ██████  ███████ ██       ██████  ██     ██
+// ██      ██    ██ ██    ██ ██   ██ ██      ██      ██    ██ ██     ██
+// ██      ██    ██ ██    ██ ██████  █████   ██      ██    ██ ██  █  ██
+// ██      ██    ██  ██  ██  ██   ██ ██      ██      ██    ██ ██ ███ ██
+//  ██████  ██████    ████   ██   ██ ██      ███████  ██████   ███ ███
 
 export const Covrflow = forwardRef<
   ElementRef<"group">,
@@ -370,6 +329,53 @@ export const Covrflow = forwardRef<
   );
 });
 
+// ██████   █████  ███    ██ ███████ ██
+// ██   ██ ██   ██ ████   ██ ██      ██
+// ██████  ███████ ██ ██  ██ █████   ██
+// ██      ██   ██ ██  ██ ██ ██      ██
+// ██      ██   ██ ██   ████ ███████ ███████
+
+const Panel = forwardRef<
+  ElementRef<typeof Box>,
+  ComponentProps<typeof Box> & {
+    state: keyof typeof STATES;
+    debug?: boolean;
+    debugOnly?: boolean;
+  }
+>(({ state, children, debug, debugOnly = false, ...props }, ref) => {
+  const posRot = {
+    position: STATES[state].position,
+    rotation: STATES[state].rotation,
+  };
+
+  const size: [number, number, number] = [3, 5, 0.1];
+
+  return (
+    <>
+      {!debugOnly && (
+        <Box
+          castShadow
+          args={size}
+          ref={ref}
+          {...posRot}
+          {...props}
+          receiveShadow
+        >
+          {children || (
+            <meshStandardMaterial transparent opacity={1} color="white" />
+          )}
+        </Box>
+      )}
+
+      {debug && (
+        <Box args={size} {...posRot} {...props}>
+          <meshStandardMaterial wireframe color="#aaa" />
+        </Box>
+      )}
+    </>
+  );
+});
+
 // ███████ ███████ ███████ ██   ██ ███████ ██████
 // ██      ██      ██      ██  ██  ██      ██   ██
 // ███████ █████   █████   █████   █████   ██████
@@ -423,7 +429,7 @@ function Seeker({
     },
   });
 
-  const cursorColor = { normal: "#c084fc", hover: "#8b5cf6" };
+  const cursorColor = { normal: "#f472b6", hover: "#ec4899" };
   const [color, setColor] = useState(cursorColor.normal);
 
   const a = 0.25;

@@ -26,7 +26,7 @@ function App() {
           <Hands />
 
           <Physics
-            debug
+            // debug
             gravity={[0, -60, 0]}
             // timeStep={1 / 60}
             //
