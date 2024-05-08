@@ -442,36 +442,61 @@ function Seeker({
 }: Omit<ComponentProps<"mesh">, "onUpdate"> & {
   onUpdate?: (val: number) => void;
 }) {
-  // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
-  const [springs, api] = useSpring(() => ({ position: [0, 0, 0] }));
-
-  const { bind, value } = useDragInertia({
+  const [springs1, api1] = useSpring(() => ({ position: [0, 0, 0] })); // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
+  const { bind: bind1, value: value1 } = useDragInertia({
     onDrag: ({ down, movement: [mx] }) => {
-      api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
+      api1.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
     },
   });
-
   useEffect(() => {
-    onUpdate?.(value);
-  }, [onUpdate, value]);
+    onUpdate?.(value1);
+  }, [onUpdate, value1]);
 
-  const cursorColor = { normal: "#f472b6", hover: "#ec4899" };
-  const [color, setColor] = useState(cursorColor.normal);
+  const [springs2, api2] = useSpring(() => ({ position: [0, 0, 0] })); // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
+  const { bind: bind2, value: value2 } = useDragInertia({
+    onDrag: ({ down, movement: [mx] }) => {
+      api2.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
+    },
+  });
+  useEffect(() => {
+    onUpdate?.(value2);
+  }, [onUpdate, value2]);
 
+  const cursorColor1 = { normal: "#f472b6", hover: "#ec4899" };
+  const [color1, setColor1] = useState(cursorColor1.normal);
+
+  const cursorColor2 = { normal: "#c084fc", hover: "#a855f7" };
+  const [color2, setColor2] = useState(cursorColor2.normal);
   const a = 0.25;
   return (
-    <animated.mesh
-      {...(bind() as any)}
-      {...props}
-      castShadow
-      receiveShadow
-      position={springs.position.to((x, y, z) => [x, a / 2, 11])}
-      onPointerEnter={() => setColor(cursorColor.hover)}
-      onPointerLeave={() => setColor(cursorColor.normal)}
-    >
-      {/* <boxGeometry args={[1.25 * a, a, a]} /> */}
-      <sphereGeometry args={[a / 2, 64, 64]} />
-      <meshStandardMaterial color={color} />
-    </animated.mesh>
+    <>
+      <animated.mesh
+        {...(bind1() as any)}
+        {...props}
+        castShadow
+        receiveShadow
+        position={springs1.position.to((x, y, z) => [x, a / 2, 11])}
+        onPointerEnter={() => setColor1(cursorColor1.hover)}
+        onPointerLeave={() => setColor1(cursorColor1.normal)}
+      >
+        {/* <boxGeometry args={[1.25 * a, a, a]} /> */}
+        <sphereGeometry args={[a / 2, 64, 64]} />
+        <meshStandardMaterial color={color1} />
+      </animated.mesh>
+
+      <animated.mesh
+        {...(bind2() as any)}
+        {...props}
+        castShadow
+        receiveShadow
+        position={springs2.position.to((x, y, z) => [x, a / 2, 12])}
+        onPointerEnter={() => setColor2(cursorColor2.hover)}
+        onPointerLeave={() => setColor2(cursorColor2.normal)}
+      >
+        {/* <boxGeometry args={[1.25 * a, a, a]} /> */}
+        <sphereGeometry args={[a / 2, 64, 64]} />
+        <meshStandardMaterial color={color2} />
+      </animated.mesh>
+    </>
   );
 }
