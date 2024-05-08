@@ -382,16 +382,12 @@ const Panel = forwardRef<
 //      ██ ██      ██      ██  ██  ██      ██   ██
 // ███████ ███████ ███████ ██   ██ ███████ ██   ██
 
-function useInertiaDrag({
+function useDragInertia({
   sensitivity = 1 / 50,
-  onDragStart,
   onDrag,
-  onDragEnd,
 }: {
   sensitivity?: number;
-  onDragStart?: Parameters<typeof useGesture>[0]["onDragStart"];
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
-  onDragEnd?: Parameters<typeof useGesture>[0]["onDragEnd"];
 } = {}) {
   const [total] = useState({ x: 0 });
   const [current] = useState({ x: 0 });
@@ -404,12 +400,10 @@ function useInertiaDrag({
 
   const bind = useGesture({
     onDragStart(...args) {
-      onDragStart?.(...args);
-
       twInertia.current?.kill(); // cancel previous inertia tween if still active
     },
     onDrag(...args) {
-      onDrag?.(...args);
+      onDrag?.(...args); // callback
 
       const {
         movement: [mx],
@@ -418,13 +412,7 @@ function useInertiaDrag({
       current.x = total.x + mx * sensitivity;
       setValue(current.x);
     },
-    onDragEnd(...args) {
-      onDragEnd?.(...args);
-
-      const {
-        movement: [mx],
-      } = args[0];
-
+    onDragEnd({ movement: [mx] }) {
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
       total.x = current.x; // update offset when dragging ends
@@ -457,7 +445,7 @@ function Seeker({
   // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
   const [springs, api] = useSpring(() => ({ position: [0, 0, 0] }));
 
-  const { bind, value } = useInertiaDrag({
+  const { bind, value } = useDragInertia({
     onDrag: ({ down, movement: [mx] }) => {
       api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
     },
