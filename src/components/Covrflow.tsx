@@ -324,7 +324,7 @@ export const Covrflow = forwardRef<
         <Panel state="backright" debug={debug} debugOnly />
       </group>
 
-      <Seeker setPos={setPos} />
+      <Seeker onUpdate={setPos} />
     </>
   );
 });
@@ -383,10 +383,10 @@ const Panel = forwardRef<
 // ███████ ███████ ███████ ██   ██ ███████ ██   ██
 
 function Seeker({
-  setPos,
+  onUpdate,
   ...props
-}: ComponentProps<"mesh"> & {
-  setPos: (val: number) => void;
+}: Omit<ComponentProps<"mesh">, "onUpdate"> & {
+  onUpdate: (val: number) => void;
 }) {
   const [total] = useState({ x: 0 });
   const [current] = useState({ x: 0 });
@@ -406,7 +406,7 @@ function Seeker({
 
       const SENSITIVITY = 1 / 50;
       current.x = total.x + mx * SENSITIVITY;
-      setPos(current.x);
+      onUpdate(current.x);
     },
     onDragEnd({ movement: [mx] }) {
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
@@ -423,7 +423,7 @@ function Seeker({
           duration: { min: 0.5, max: 1.5 },
         },
         onUpdate() {
-          setPos(total.x);
+          onUpdate(total.x);
         },
       });
     },
