@@ -197,7 +197,7 @@ export function Inertia({ ...props }) {
   );
 }
 
-type CustomDragEvent = EventTypes["drag"] & { object: THREE.Mesh }; // event.object does not exist on `EventTypes["drag"]` natively :/
+type CustomDragEvent = EventTypes["drag"] & { object: THREE.Mesh }; // event.object does not exist on `EventTypes["drag"]` natively :/ (asked on: https://discord.com/channels/740090768164651008/740093202987483156/1238080861686206464)
 
 function useInertiaDrag({
   sensitivity = 1 / 200,
