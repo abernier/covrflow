@@ -3,7 +3,6 @@ import {
   ComponentProps,
   ElementRef,
   MutableRefObject,
-  ReactNode,
   createContext,
   forwardRef,
   useCallback,
@@ -26,8 +25,6 @@ import {
 } from "@use-gesture/react";
 import { animated, useSpring } from "@react-spring/three";
 import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
-
-import { Events } from "@react-three/fiber";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -202,11 +199,11 @@ type CustomDragEvent = EventTypes["drag"] & { object: THREE.Mesh }; // event.obj
 function useInertiaDrag({
   sensitivity = 1 / 200,
   onDrag,
-  duration = { min: 0.5, max: 1.5 },
+  duration: [durMin, durMax] = [0.5, 1.5],
 }: {
   sensitivity?: number;
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
-  duration?: gsap.InertiaDuration;
+  duration?: [number, number];
 } = {}) {
   const { total, obj, twInertia, tracker, state, seat } = useInertia();
   const [, set] = state; // Final value
@@ -261,7 +258,7 @@ function useInertiaDrag({
             velocity,
             end: gsap.utils.snap(1),
           },
-          duration,
+          duration: { min: durMin, max: durMax },
         },
         onUpdate() {
           // console.log("tick");
@@ -531,16 +528,21 @@ const Panel = forwardRef<
       rotation: STATES[state].rotation,
     };
 
-    const { sensitivity } = useControls({
+    const { sensitivity, duration } = useControls({
       sensitivity: {
         value: 1 / 100,
         min: 1 / 500,
         max: 1 / 50,
         step: 1 / 1000,
       },
+      duration: {
+        value: [0.5, 1.5],
+        min: 0.01,
+        max: 2,
+      },
     });
 
-    const { bind } = useInertiaDrag({ sensitivity });
+    const { bind } = useInertiaDrag({ sensitivity, duration });
 
     return (
       <>
