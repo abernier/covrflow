@@ -163,6 +163,7 @@ const [useInertia, InertiaProvider] = createRequiredContext<{
   total: MutableRefObject<number>;
   obj: MutableRefObject<number>;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
+  tracker: gsap.VelocityTrackerInstance;
   state: [number, Dispatch<SetStateAction<number>>];
 }>();
 
@@ -171,10 +172,15 @@ export function Inertia({ ...props }) {
   const obj = useRef(0);
   const twInertia = useRef<gsap.core.Tween>();
 
+  const tracker = VelocityTracker.track(obj, "current")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+
   const state = useState(0);
 
   return (
-    <InertiaProvider value={{ total, obj, twInertia, state }} {...props} />
+    <InertiaProvider
+      value={{ total, obj, twInertia, tracker, state }}
+      {...props}
+    />
   );
 }
 
@@ -187,10 +193,8 @@ function useInertiaDrag({
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
   duration?: gsap.InertiaDuration;
 } = {}) {
-  const { total, obj, twInertia, state } = useInertia();
+  const { total, obj, twInertia, tracker, state } = useInertia();
   const [, set] = state; // Final value
-
-  const tracker = VelocityTracker.track(obj, "current")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
 
   const bind = useGesture({
     onDragStart() {
