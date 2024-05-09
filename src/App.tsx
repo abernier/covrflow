@@ -8,10 +8,13 @@ import { XR, Controllers, Hands, XRButton, VRButton } from "@react-three/xr";
 import Layout from "./Layout";
 import Ground from "./components/Ground";
 import { Covrflow } from "./components/Covrflow";
+import { Leva } from "leva";
 
 function App() {
   return (
     <Styled>
+      <Leva collapsed />
+
       <VRButton />
       <Canvas
         shadows

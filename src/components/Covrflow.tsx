@@ -531,7 +531,16 @@ const Panel = forwardRef<
       rotation: STATES[state].rotation,
     };
 
-    const { bind } = useInertiaDrag();
+    const { sensitivity } = useControls({
+      sensitivity: {
+        value: 1 / 100,
+        min: 1 / 500,
+        max: 1 / 50,
+        step: 1 / 1000,
+      },
+    });
+
+    const { bind } = useInertiaDrag({ sensitivity });
 
     return (
       <>
