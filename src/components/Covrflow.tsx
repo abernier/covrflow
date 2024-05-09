@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import {
   ComponentProps,
   ElementRef,
@@ -17,9 +18,16 @@ import { Box } from "@react-three/drei";
 import { useControls } from "leva";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { createUseGesture, dragAction, pinchAction } from "@use-gesture/react";
+import {
+  EventTypes,
+  createUseGesture,
+  dragAction,
+  pinchAction,
+} from "@use-gesture/react";
 import { animated, useSpring } from "@react-spring/three";
 import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
+
+import { Events } from "@react-three/fiber";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -159,12 +167,15 @@ export function Covrflow() {
 // ██ ██  ██ ██ ██      ██   ██    ██    ██ ██   ██
 // ██ ██   ████ ███████ ██   ██    ██    ██ ██   ██
 
+type Seat = THREE.Mesh | null;
+
 const [useInertia, InertiaProvider] = createRequiredContext<{
   total: MutableRefObject<number>;
   obj: MutableRefObject<number>;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
   tracker: gsap.VelocityTrackerInstance;
   state: [number, Dispatch<SetStateAction<number>>];
+  seat: MutableRefObject<Seat>;
 }>();
 
 export function Inertia({ ...props }) {
@@ -172,20 +183,24 @@ export function Inertia({ ...props }) {
   const obj = useRef(0);
   const twInertia = useRef<gsap.core.Tween>();
 
+  const seat = useRef<Seat>(null); // `null` mean the seat is available
+
   const tracker = VelocityTracker.track(obj, "current")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
 
   const state = useState(0);
 
   return (
     <InertiaProvider
-      value={{ total, obj, twInertia, tracker, state }}
+      value={{ total, obj, twInertia, tracker, state, seat }}
       {...props}
     />
   );
 }
 
+type CustomDragEvent = EventTypes["drag"] & { object: THREE.Mesh }; // event.object does not exist on `EventTypes["drag"]` natively :/
+
 function useInertiaDrag({
-  sensitivity = 1 / 50,
+  sensitivity = 1 / 200,
   onDrag,
   duration = { min: 0.5, max: 1.5 },
 }: {
@@ -193,38 +208,63 @@ function useInertiaDrag({
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
   duration?: gsap.InertiaDuration;
 } = {}) {
-  const { total, obj, twInertia, tracker, state } = useInertia();
+  const { total, obj, twInertia, tracker, state, seat } = useInertia();
   const [, set] = state; // Final value
 
   const bind = useGesture({
-    onDragStart() {
+    onDragStart({ event }) {
+      // console.log("onDragStart");
+
+      // Taking the seat if available
+      if (seat.current !== null) return; // if not => skip
+      seat.current = (event as CustomDragEvent).object;
+
       twInertia.current?.kill(); // cancel previous inertia tween if still active
     },
     onDrag(...args) {
-      onDrag?.(...args); // callback
+      // console.log("onDrag");
 
       const {
         movement: [mx],
+        event,
       } = args[0];
+
+      if (seat.current !== (event as CustomDragEvent).object) return;
+
+      onDrag?.(...args); // callback
 
       obj.current = total.current + mx * sensitivity;
       set(obj.current);
     },
-    onDragEnd({ movement: [mx] }) {
+    onDragEnd(...args) {
+      // console.log("onDragEnd");
+
+      const {
+        movement: [mx],
+        event,
+      } = args[0];
+
+      // Releasing the seat on "dragend"
+      if (seat.current !== (event as CustomDragEvent).object) return;
+      seat.current = null;
+
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
-      total.current = obj.current; // update `total` when dragging ends
+      const velocity = tracker.get("current");
+
+      total.current = obj.current; // Important: update `total` when dragging ends
 
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
       twInertia.current = gsap.to(total, {
         inertia: {
           current: {
-            velocity: tracker.get("current"),
+            velocity,
             end: gsap.utils.snap(1),
           },
           duration,
         },
         onUpdate() {
+          // console.log("tick");
           set(total.current);
         },
       });
@@ -425,7 +465,7 @@ function Panels() {
   } = useInertia();
 
   useEffect(() => {
-    setPos(value);
+    setPos(value); // sync gui.pos with inertia value
   }, [setPos, value]);
 
   const debug = gui.debug;
