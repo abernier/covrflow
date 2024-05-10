@@ -9,6 +9,7 @@ import { Environment, PerspectiveCamera, useHelper } from "@react-three/drei";
 import { useControls, folder } from "leva";
 
 import Gamepads from "./Gamepads";
+import Ground from "./components/Ground";
 
 function Layout({
   children,
@@ -29,6 +30,9 @@ function Layout({
   }));
   // console.log("gui=", gui);
 
+  const XRsession = useXR((state) => state.session);
+  const isAR = XRsession && XRsession.environmentBlendMode === "alpha-blend";
+
   // const spotLightRef = useRef(null);
   // useHelper(spotLightRef, SpotLightHelper, "yellow");
 
@@ -38,12 +42,14 @@ function Layout({
 
       <Gamepads />
 
-      <Environment background>
-        <mesh scale={100}>
-          <sphereGeometry args={[1, 64, 64]} />
-          <meshBasicMaterial color={gui.bg} side={THREE.BackSide} />
-        </mesh>
-      </Environment>
+      {!isAR && (
+        <Environment background>
+          <mesh scale={100}>
+            <sphereGeometry args={[1, 64, 64]} />
+            <meshBasicMaterial color={gui.bg} side={THREE.BackSide} />
+          </mesh>
+        </Environment>
+      )}
 
       <spotLight
         // ref={spotLightRef}
@@ -62,6 +68,8 @@ function Layout({
       {gui.axes && <axesHelper args={[5]} />}
 
       {children}
+
+      {!isAR && <Ground />}
     </>
   );
 }

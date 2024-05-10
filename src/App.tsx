@@ -3,10 +3,9 @@ import styled from "@emotion/styled";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { XR, Controllers, Hands, XRButton, VRButton } from "@react-three/xr";
+import { XR, Controllers, Hands, ARButton } from "@react-three/xr";
 
 import Layout from "./Layout";
-import Ground from "./components/Ground";
 import { Covrflow } from "./components/Covrflow";
 import { Leva } from "leva";
 
@@ -15,7 +14,8 @@ function App() {
     <Styled>
       <Leva collapsed />
 
-      <VRButton />
+      <ARButton />
+
       <Canvas
         shadows
         // camera={{
@@ -67,8 +67,6 @@ function Scene() {
   return (
     <>
       <Covrflow />
-
-      <Ground />
     </>
   );
 }
