@@ -72,6 +72,8 @@ function Scene() {
   const posState = useState(0);
   const [pos, setPos] = posState;
 
+  const [foo, setFoo] = useState(0);
+
   const [gui, setGui] = useControls(() => ({
     pos: {
       value: 0,
@@ -82,8 +84,20 @@ function Scene() {
     nav: buttonGroup({
       label: "navigation",
       opts: {
-        prev: (get) => covrflowRef.current?.go(get("pos") - 1),
-        next: (get) => covrflowRef.current?.go(get("pos") + 1),
+        prev: (get) => {
+          setFoo((prev) => {
+            const newVal = prev - 1;
+            covrflowRef.current?.go(newVal);
+            return newVal;
+          });
+        },
+        next: (get) => {
+          setFoo((prev) => {
+            const newVal = prev + 1;
+            covrflowRef.current?.go(newVal);
+            return newVal;
+          });
+        },
       },
     }),
     debug: false,

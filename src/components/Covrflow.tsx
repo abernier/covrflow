@@ -189,6 +189,7 @@ const [useCovrflow, Provider] = createRequiredContext<{
   state: PosState;
   seat: MutableRefObject<Seat>;
   go: (pos: number) => void;
+  feather: (val: number, end?: gsap.InertiaObject["end"]) => void;
   debug: boolean;
 }>();
 
@@ -215,6 +216,27 @@ export const Inertia = forwardRef<
     VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
   );
 
+  const feather = useCallback(
+    (val: number, end: gsap.InertiaObject["end"] = gsap.utils.snap(1)) => {
+      total.current = val; // Important: update `total` when dragging ends
+      // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
+      twInertia.current = gsap.to(total, {
+        inertia: {
+          current: {
+            velocity: tracker.get("current"),
+            end,
+          },
+          duration: { min: 0.5, max: 1.5 },
+        },
+        onUpdate() {
+          // console.log("tick");
+          setPos(total.current);
+        },
+      });
+    },
+    [setPos, tracker]
+  );
+
   const value = useMemo(
     () => ({
       total,
@@ -227,32 +249,12 @@ export const Inertia = forwardRef<
       go(val: number) {
         console.log("go from %s to %s", pos, val);
         twInertia.current?.kill(); // cancel previous inertia tween if still active
-
-        total.current = pos; // Important: update `total` when dragging ends
-        // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-        twInertia.current = gsap.to(total, {
-          inertia: {
-            current: {
-              velocity: tracker.get("current"),
-              end: (n) => gsap.utils.snap(1)(val),
-            },
-            duration: { min: 0.5, max: 1.5 },
-          },
-          onStart() {
-            console.log("onStart", total.current);
-          },
-          onComplete() {
-            console.log("onComplete", total.current);
-          },
-          onUpdate() {
-            // console.log("tick");
-            setPos(total.current);
-          },
-        });
+        feather(pos, (n) => gsap.utils.snap(1)(val));
       },
+      feather,
       debug,
     }),
-    [tlPanels, tracker, state, debug, pos, setPos]
+    [tlPanels, tracker, state, feather, debug, pos]
   );
 
   useImperativeHandle(ref, () => value, [value]);
@@ -279,7 +281,7 @@ function useDrag({
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
   duration?: [number, number];
 } = {}) {
-  const { total, obj, twInertia, tracker, state, seat } = useCovrflow();
+  const { total, obj, twInertia, state, seat, feather } = useCovrflow();
   let [pos, setPos] = state;
 
   const bind = useGesture({
@@ -322,21 +324,7 @@ function useDrag({
 
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
-      total.current = obj.current; // Important: update `total` when dragging ends
-      // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-      twInertia.current = gsap.to(total, {
-        inertia: {
-          current: {
-            velocity: tracker.get("current"),
-            end: (n) => gsap.utils.snap(1)(n),
-          },
-          duration: { min: durMin, max: durMax },
-        },
-        onUpdate() {
-          // console.log("tick");
-          setPos(total.current);
-        },
-      });
+      feather(obj.current);
     },
   });
 
