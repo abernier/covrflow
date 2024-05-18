@@ -12,6 +12,8 @@ import {
   useState,
   Dispatch,
   SetStateAction,
+  useMemo,
+  useImperativeHandle,
 } from "react";
 import { Box } from "@react-three/drei";
 import { useControls } from "leva";
@@ -25,6 +27,8 @@ import {
 } from "@use-gesture/react";
 import { animated, useSpring } from "@react-spring/three";
 import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
+import { Interactive, useInteraction } from "@react-three/xr";
+import { Vector2 } from "three";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -150,58 +154,123 @@ const STATES = {
 // ██      ██    ██  ██  ██  ██   ██ ██      ██      ██    ██ ██ ███ ██
 //  ██████  ██████    ████   ██   ██ ██      ███████  ██████   ███ ███
 
+type PosState = [number, Dispatch<SetStateAction<number>>];
+
 export const Covrflow = forwardRef<
-  ElementRef<"group">,
-  ComponentProps<"group">
->((props, ref) => {
+  ElementRef<typeof Inertia>,
+  { state?: PosState; debug?: boolean } & ComponentProps<"group">
+>(({ state: externalState, debug, ...props }, ref) => {
+  let internalState = useState(0);
+  const posState = externalState || internalState;
+
   return (
-    <group ref={ref} {...props}>
-      <Inertia>
+    <group {...props}>
+      <Inertia ref={ref} state={posState} debug={debug}>
         <Panels />
       </Inertia>
     </group>
   );
 });
 
-// ██ ███    ██ ███████ ██████  ████████ ██  █████
-// ██ ████   ██ ██      ██   ██    ██    ██ ██   ██
-// ██ ██ ██  ██ █████   ██████     ██    ██ ███████
-// ██ ██  ██ ██ ██      ██   ██    ██    ██ ██   ██
-// ██ ██   ████ ███████ ██   ██    ██    ██ ██   ██
+// ██████  ██████   ██████  ██    ██ ██ ██████  ███████ ██████
+// ██   ██ ██   ██ ██    ██ ██    ██ ██ ██   ██ ██      ██   ██
+// ██████  ██████  ██    ██ ██    ██ ██ ██   ██ █████   ██████
+// ██      ██   ██ ██    ██  ██  ██  ██ ██   ██ ██      ██   ██
+// ██      ██   ██  ██████    ████   ██ ██████  ███████ ██   ██
 
 type Seat = THREE.Mesh | null;
 
-const [useInertia, InertiaProvider] = createRequiredContext<{
+const [useCovrflow, Provider] = createRequiredContext<{
   total: MutableRefObject<number>;
   obj: MutableRefObject<number>;
+  tlPanels: gsap.core.Timeline;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
   tracker: gsap.VelocityTrackerInstance;
-  state: [number, Dispatch<SetStateAction<number>>];
+  state: PosState;
   seat: MutableRefObject<Seat>;
+  go: (pos: number) => void;
+  debug: boolean;
 }>();
 
-export function Inertia({ ...props }) {
-  const total = useRef(0);
-  const obj = useRef(0);
-  const twInertia = useRef<gsap.core.Tween>();
+export const Inertia = forwardRef<
+  ReturnType<typeof useCovrflow>,
+  {
+    children: React.ReactNode;
+    state?: ReturnType<typeof useCovrflow>["state"];
+    debug?: boolean;
+  }
+>(({ children, state: externalState, debug = false }, ref) => {
+  let internalState = useState(0);
+  const state = externalState || internalState;
+  const [pos, setPos] = state;
 
   const seat = useRef<Seat>(null); // `null` mean the seat is available
 
-  const tracker = VelocityTracker.track(obj, "current")[0]; // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+  const [tlPanels] = useState(gsap.timeline({ paused: true }));
 
-  const state = useState(0);
-
-  return (
-    <InertiaProvider
-      value={{ total, obj, twInertia, tracker, state, seat }}
-      {...props}
-    />
+  const total = useRef(0);
+  const obj = useRef(0);
+  const twInertia = useRef<gsap.core.Tween>();
+  const [tracker] = useState(
+    VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
   );
-}
+
+  const value = useMemo(
+    () => ({
+      total,
+      obj,
+      tlPanels,
+      twInertia,
+      tracker,
+      state,
+      seat,
+      go(val: number) {
+        console.log("go from %s to %s", pos, val);
+        twInertia.current?.kill(); // cancel previous inertia tween if still active
+
+        total.current = pos; // Important: update `total` when dragging ends
+        // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
+        twInertia.current = gsap.to(total, {
+          inertia: {
+            current: {
+              velocity: tracker.get("current"),
+              end: (n) => gsap.utils.snap(1)(val),
+            },
+            duration: { min: 0.5, max: 1.5 },
+          },
+          onStart() {
+            console.log("onStart", total.current);
+          },
+          onComplete() {
+            console.log("onComplete", total.current);
+          },
+          onUpdate() {
+            // console.log("tick");
+            setPos(total.current);
+          },
+        });
+      },
+      debug,
+    }),
+    [tlPanels, tracker, state, debug, pos, setPos]
+  );
+
+  useImperativeHandle(ref, () => value, [value]);
+
+  return <Provider value={value}>{children}</Provider>;
+});
+
+// ██████  ██████   █████   ██████
+// ██   ██ ██   ██ ██   ██ ██
+// ██   ██ ██████  ███████ ██   ███
+// ██   ██ ██   ██ ██   ██ ██    ██
+// ██████  ██   ██ ██   ██  ██████
+//
+// with inertia
 
 type CustomDragEvent = EventTypes["drag"] & { object: THREE.Mesh }; // event.object does not exist on `EventTypes["drag"]` natively :/ (asked on: https://discord.com/channels/740090768164651008/740093202987483156/1238080861686206464)
 
-function useInertiaDrag({
+function useDrag({
   sensitivity = 1 / 200,
   onDrag,
   duration: [durMin, durMax] = [0.5, 1.5],
@@ -210,8 +279,8 @@ function useInertiaDrag({
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
   duration?: [number, number];
 } = {}) {
-  const { total, obj, twInertia, tracker, state, seat } = useInertia();
-  const [, set] = state; // Final value
+  const { total, obj, twInertia, tracker, state, seat } = useCovrflow();
+  let [pos, setPos] = state;
 
   const bind = useGesture({
     onDragStart({ event }) {
@@ -222,6 +291,7 @@ function useInertiaDrag({
       seat.current = (event as CustomDragEvent).object;
 
       twInertia.current?.kill(); // cancel previous inertia tween if still active
+      total.current = pos; // Important: update `total` when dragging starts
     },
     onDrag(...args) {
       // console.log("onDrag");
@@ -236,7 +306,7 @@ function useInertiaDrag({
       onDrag?.(...args); // callback
 
       obj.current = total.current + mx * sensitivity;
-      set(obj.current);
+      setPos(obj.current);
     },
     onDragEnd(...args) {
       // console.log("onDragEnd");
@@ -252,22 +322,19 @@ function useInertiaDrag({
 
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
-      const velocity = tracker.get("current");
-
       total.current = obj.current; // Important: update `total` when dragging ends
-
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
       twInertia.current = gsap.to(total, {
         inertia: {
           current: {
-            velocity,
-            end: gsap.utils.snap(1),
+            velocity: tracker.get("current"),
+            end: (n) => gsap.utils.snap(1)(n),
           },
           duration: { min: durMin, max: durMax },
         },
         onUpdate() {
           // console.log("tick");
-          set(total.current);
+          setPos(total.current);
         },
       });
     },
@@ -287,7 +354,7 @@ function Panels() {
   // Tweens
   //
 
-  const [tl] = useState(gsap.timeline({ paused: true }));
+  const { tlPanels: tl, state, go, debug } = useCovrflow();
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
   const panel2Ref = useRef<ElementRef<typeof Box>>(null);
@@ -423,54 +490,15 @@ function Panels() {
   // GUI
   //
 
-  const [gui, setGui] = useControls(() => ({
-    pos: 0,
-    debug: false,
-  }));
-
-  const pos = gui.pos;
-  const setPos = useCallback((pos: number) => setGui({ pos }), [setGui]);
+  const [pos, setPos] = state;
 
   useEffect(() => {
-    tl.seek(mod(pos)); // seek [0..1] once `pos` changes
-  }, [tl, pos]);
-
-  //
-  // prev/next
-  //
-
-  // const twPrevNext = useRef<gsap.core.Tween>();
-
-  // const prevNextHandler = useCallback(
-  //   (direction: "next" | "prev") => {
-  //     const dir = direction === "prev" ? -1 : 1;
-
-  //     return contextSafe(() => {
-  //       twPrevNext.current?.kill();
-
-  //       const o = { val: gui.pos };
-  //       twPrevNext.current = gsap.to(o, {
-  //         val: Math.floor(gui.pos) + 1 * dir,
-  //         onUpdate: () => setPos(o.val),
-  //       });
-  //     });
-  //   },
-  //   [contextSafe, gui.pos, setPos]
-  // );
+    tl.seek(mod(pos)); // seek [0..1]
+  }, [pos, tl]);
 
   //
   //
   //
-
-  const {
-    state: [value],
-  } = useInertia();
-
-  useEffect(() => {
-    setPos(value); // sync gui.pos with inertia value
-  }, [setPos, value]);
-
-  const debug = gui.debug;
 
   const size: [number, number, number] = [3, 5, 0.1];
   return (
@@ -491,7 +519,6 @@ function Panels() {
           state="left"
           debug={debug}
           size={size}
-          // onPointerUp={prevNextHandler("prev")}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 1 + 2)} />
         </Panel>
@@ -510,7 +537,6 @@ function Panels() {
           state="right"
           debug={debug}
           size={size}
-          // onPointerUp={prevNextHandler("next")}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 3 + 2)} />
         </Panel>
@@ -567,11 +593,78 @@ const Panel = forwardRef<
       },
     });
 
-    const { bind } = useInertiaDrag({ sensitivity, duration });
+    const { bind } = useDrag({ sensitivity, duration });
+
+    // const [_pointer] = useState(new Vector2());
+    // const [_event] = useState({ type: "", data: _pointer });
+
+    // const dragging = useRef(false);
 
     return (
       <>
         {!debugOnly && (
+          // <Interactive
+          //   onSelectStart={(e) => {
+          //     console.log("onSelectStart", e);
+
+          //     dragging.current = true;
+
+          //     if (!e.intersection?.uv) return;
+
+          //     const uv = e.intersection?.uv;
+          //     const object = e.intersection?.object;
+
+          //     _event.type = "mousedown";
+          //     _event.data.set(uv.x, 1 - uv.y);
+
+          //     const clientX = uv.x * window.innerWidth;
+          //     const clientY = uv.y * window.innerHeight;
+
+          //     object.dispatchEvent(
+          //       new PointerEvent("pointerdown", { clientX, clientY })
+          //     );
+          //   }}
+          //   onSelectEnd={(e) => {
+          //     console.log("onSelectEnd", e);
+
+          //     dragging.current = false;
+
+          //     if (!e.intersection?.uv) return;
+
+          //     const uv = e.intersection?.uv;
+          //     const object = e.intersection?.object;
+
+          //     // _event.type = "mouseup";
+          //     // _event.data.set(uv.x, 1 - uv.y);
+          //     // object.dispatchEvent(_event);
+
+          //     const clientX = uv.x * window.innerWidth;
+          //     const clientY = uv.y * window.innerHeight;
+          //     object.dispatchEvent(
+          //       new PointerEvent("pointerup", { clientX, clientY })
+          //     );
+          //   }}
+          //   onMove={(e) => {
+          //     if (dragging.current !== true) return; // skip if not dragging
+          //     console.log("onMove", e);
+
+          //     if (!e.intersection?.uv) return;
+
+          //     const uv = e.intersection?.uv;
+          //     const object = e.intersection?.object;
+
+          //     // _event.type = "mousemove";
+          //     // _event.data.set(uv.x, 1 - uv.y);
+          //     // object.dispatchEvent(_event);
+
+          //     const clientX = uv.x * window.innerWidth;
+          //     const clientY = uv.y * window.innerHeight;
+          //     console.log(clientX, clientY);
+          //     object.dispatchEvent(
+          //       new PointerEvent("pointermove", { clientX, clientY })
+          //     );
+          //   }}
+          // >
           <Box
             args={size}
             ref={ref}
@@ -585,6 +678,7 @@ const Panel = forwardRef<
               <meshStandardMaterial transparent opacity={1} color="white" />
             )}
           </Box>
+          // </Interactive>
         )}
 
         {debug && (
@@ -605,7 +699,7 @@ const Panel = forwardRef<
 
 function Seeker({ ...props }: ComponentProps<"mesh"> & {}) {
   const [springs, api] = useSpring(() => ({ position: [0, 0, 0] })); // https://codesandbox.io/p/sandbox/react-three-fiber-gestures-fig3s
-  const { bind } = useInertiaDrag({
+  const { bind } = useDrag({
     onDrag: ({ down, movement: [mx] }) => {
       api.start({ position: down ? [mx / 200, 0, 0] : [0, 0, 0] });
     },
