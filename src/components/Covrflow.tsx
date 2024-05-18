@@ -150,13 +150,18 @@ const STATES = {
 // ██      ██    ██  ██  ██  ██   ██ ██      ██      ██    ██ ██ ███ ██
 //  ██████  ██████    ████   ██   ██ ██      ███████  ██████   ███ ███
 
-export function Covrflow() {
+export const Covrflow = forwardRef<
+  ElementRef<"group">,
+  ComponentProps<"group">
+>((props, ref) => {
   return (
-    <Inertia>
-      <Panels />
-    </Inertia>
+    <group ref={ref} {...props}>
+      <Inertia>
+        <Panels />
+      </Inertia>
+    </group>
   );
-}
+});
 
 // ██ ███    ██ ███████ ██████  ████████ ██  █████
 // ██ ████   ██ ██      ██   ██    ██    ██ ██   ██
@@ -471,10 +476,17 @@ function Panels() {
   return (
     <>
       <group position={[0, size[1] / 2 + 0.01, 0]}>
-        <Panel ref={panel1Ref} state="backleft" debug={debug} size={size}>
+        <Panel
+          name="backleft"
+          ref={panel1Ref}
+          state="backleft"
+          debug={debug}
+          size={size}
+        >
           <meshStandardMaterial color={circular(Math.floor(pos) - 0 + 2)} />
         </Panel>
         <Panel
+          name="left"
           ref={panel2Ref}
           state="left"
           debug={debug}
@@ -483,10 +495,17 @@ function Panels() {
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 1 + 2)} />
         </Panel>
-        <Panel ref={panel3Ref} state="front" debug={debug} size={size}>
+        <Panel
+          name="front"
+          ref={panel3Ref}
+          state="front"
+          debug={debug}
+          size={size}
+        >
           <meshStandardMaterial color={circular(Math.floor(pos) - 2 + 2)} />
         </Panel>
         <Panel
+          name="right"
           ref={panel4Ref}
           state="right"
           debug={debug}
@@ -496,7 +515,13 @@ function Panels() {
           <meshStandardMaterial color={circular(Math.floor(pos) - 3 + 2)} />
         </Panel>
 
-        <Panel state="backright" debug={debug} debugOnly size={size} />
+        <Panel
+          name="backright"
+          state="backright"
+          debug={debug}
+          debugOnly
+          size={size}
+        />
       </group>
 
       {debug && <Seeker />}

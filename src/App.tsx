@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { ElementRef, useEffect, useRef } from "react";
 import styled from "@emotion/styled";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
@@ -64,9 +64,11 @@ function Scene() {
     }, [escPressed, gl.xr]);
   }
 
+  const covrflowRef = useRef<ElementRef<typeof Covrflow>>(null);
+
   return (
     <>
-      <Covrflow />
+      <Covrflow ref={covrflowRef} />
     </>
   );
 }
