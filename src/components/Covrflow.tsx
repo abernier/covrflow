@@ -29,6 +29,7 @@ import { animated, useSpring } from "@react-spring/three";
 import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
 import { Interactive, useInteraction } from "@react-three/xr";
 import { Vector2 } from "three";
+import merge from "deepmerge";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -156,16 +157,26 @@ const STATES = {
 
 type PosState = [number, Dispatch<SetStateAction<number>>];
 
+const defaultOptions = {
+  sensitivity: 1 / 200,
+  duration: [0.5, 1.5] as [number, number],
+  debug: false,
+};
+type Options = Partial<typeof defaultOptions>;
+
 export const Covrflow = forwardRef<
   ElementRef<typeof Inertia>,
-  { state?: PosState; debug?: boolean } & ComponentProps<"group">
->(({ state: externalState, debug, ...props }, ref) => {
+  {
+    state?: PosState;
+    options?: Options;
+  } & ComponentProps<"group">
+>(({ state: externalState, options, ...props }, ref) => {
   let internalState = useState(0);
   const posState = externalState || internalState;
 
   return (
     <group {...props}>
-      <Inertia ref={ref} state={posState} debug={debug}>
+      <Inertia ref={ref} state={posState} options={options}>
         <Panels />
       </Inertia>
     </group>
@@ -190,17 +201,19 @@ const [useCovrflow, Provider] = createRequiredContext<{
   seat: MutableRefObject<Seat>;
   go: (pos: number) => void;
   feather: (val: number, end?: gsap.InertiaObject["end"]) => void;
-  debug: boolean;
+  options: Options;
 }>();
 
 export const Inertia = forwardRef<
   ReturnType<typeof useCovrflow>,
   {
     children: React.ReactNode;
-    state?: ReturnType<typeof useCovrflow>["state"];
-    debug?: boolean;
+    state?: PosState;
+    options?: Options;
   }
->(({ children, state: externalState, debug = false }, ref) => {
+>(({ children, state: externalState, options = {} }, ref) => {
+  const opts = merge(options, defaultOptions);
+
   let internalState = useState(0);
   const state = externalState || internalState;
   const [pos, setPos] = state;
@@ -226,7 +239,7 @@ export const Inertia = forwardRef<
             velocity: tracker.get("current"),
             end,
           },
-          duration: { min: 0.5, max: 1.5 },
+          duration: { min: opts.duration[0], max: opts.duration[1] },
         },
         onUpdate() {
           // console.log("tick");
@@ -234,7 +247,7 @@ export const Inertia = forwardRef<
         },
       });
     },
-    [setPos, tracker]
+    [opts.duration, setPos, tracker]
   );
 
   const value = useMemo(
@@ -252,9 +265,9 @@ export const Inertia = forwardRef<
         feather(pos, (n) => gsap.utils.snap(1)(val));
       },
       feather,
-      debug,
+      options,
     }),
-    [tlPanels, tracker, state, feather, debug, pos]
+    [tlPanels, tracker, state, feather, options, pos]
   );
 
   useImperativeHandle(ref, () => value, [value]);
@@ -342,7 +355,7 @@ function Panels() {
   // Tweens
   //
 
-  const { tlPanels: tl, state, go, debug } = useCovrflow();
+  const { tlPanels: tl, state, options } = useCovrflow();
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
   const panel2Ref = useRef<ElementRef<typeof Box>>(null);
@@ -496,7 +509,7 @@ function Panels() {
           name="backleft"
           ref={panel1Ref}
           state="backleft"
-          debug={debug}
+          debug={options.debug}
           size={size}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 0 + 2)} />
@@ -505,7 +518,7 @@ function Panels() {
           name="left"
           ref={panel2Ref}
           state="left"
-          debug={debug}
+          debug={options.debug}
           size={size}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 1 + 2)} />
@@ -514,7 +527,7 @@ function Panels() {
           name="front"
           ref={panel3Ref}
           state="front"
-          debug={debug}
+          debug={options.debug}
           size={size}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 2 + 2)} />
@@ -523,7 +536,7 @@ function Panels() {
           name="right"
           ref={panel4Ref}
           state="right"
-          debug={debug}
+          debug={options.debug}
           size={size}
         >
           <meshStandardMaterial color={circular(Math.floor(pos) - 3 + 2)} />
@@ -532,13 +545,13 @@ function Panels() {
         <Panel
           name="backright"
           state="backright"
-          debug={debug}
+          debug={options.debug}
           debugOnly
           size={size}
         />
       </group>
 
-      {debug && <Seeker />}
+      {options.debug && <Seeker />}
     </>
   );
 }
@@ -567,19 +580,9 @@ const Panel = forwardRef<
       rotation: STATES[state].rotation,
     };
 
-    const { sensitivity, duration } = useControls({
-      sensitivity: {
-        value: 1 / 100,
-        min: 1 / 500,
-        max: 1 / 50,
-        step: 1 / 1000,
-      },
-      duration: {
-        value: [0.5, 1.5],
-        min: 0.01,
-        max: 2,
-      },
-    });
+    const {
+      options: { sensitivity, duration },
+    } = useCovrflow();
 
     const { bind } = useDrag({ sensitivity, duration });
 

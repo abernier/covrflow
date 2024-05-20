@@ -100,6 +100,17 @@ function Scene() {
         },
       },
     }),
+    sensitivity: {
+      value: 1 / 100,
+      min: 1 / 500,
+      max: 1 / 50,
+      step: 1 / 1000,
+    },
+    duration: {
+      value: [0.5, 1.5],
+      min: 0.01,
+      max: 2,
+    },
     debug: false,
   }));
 
@@ -160,7 +171,15 @@ function Scene() {
 
   return (
     <>
-      <Covrflow ref={covrflowRef} state={posState} debug={gui.debug} />
+      <Covrflow
+        ref={covrflowRef}
+        state={posState}
+        options={{
+          sensitivity: gui.sensitivity,
+          duration: gui.duration,
+          debug: gui.debug,
+        }}
+      />
 
       {/* <Box ref={boxRef} args={[6, 6, 6]} /> */}
     </>
