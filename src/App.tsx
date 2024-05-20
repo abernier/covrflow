@@ -20,6 +20,7 @@ import {
   useHitTest,
   useXREvent,
 } from "@react-three/xr";
+import gsap from "gsap";
 
 import Layout from "./Layout";
 import { Covrflow } from "./components/Covrflow";
@@ -68,6 +69,13 @@ export default App;
 
 function Scene() {
   const covrflowRef = useRef<ElementRef<typeof Covrflow>>(null);
+
+  useEffect(() => {
+    gsap.ticker.remove(gsap.updateRoot);
+  }, []);
+  useFrame(({ clock }) => {
+    gsap.updateRoot(clock.elapsedTime);
+  });
 
   const [gui, setGui] = useControls(() => ({
     pos: {
