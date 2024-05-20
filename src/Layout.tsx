@@ -3,8 +3,13 @@ import { SpotLightHelper } from "three";
 
 import { type ElementRef, type ReactNode, useEffect, useRef } from "react";
 // import { useFrame } from "@react-three/fiber";
-import { useXR } from "@react-three/xr";
-import { Environment, PerspectiveCamera, useHelper } from "@react-three/drei";
+import { useHitTest, useXR } from "@react-three/xr";
+import {
+  Environment,
+  PerspectiveCamera,
+  useHelper,
+  Stats,
+} from "@react-three/drei";
 
 import { useControls, folder } from "leva";
 
@@ -30,6 +35,10 @@ function Layout({
   }));
   // console.log("gui=", gui);
 
+  useHitTest((...args) => {
+    // console.log("hitTest", ...args);
+  });
+
   const XRsession = useXR((state) => state.session);
   const isAR = XRsession && XRsession.environmentBlendMode === "alpha-blend";
 
@@ -38,6 +47,7 @@ function Layout({
 
   return (
     <>
+      <Stats />
       <Camera />
 
       <Gamepads />
