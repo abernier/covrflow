@@ -167,16 +167,16 @@ type Options = Partial<typeof defaultOptions>;
 export const Covrflow = forwardRef<
   ElementRef<typeof Inertia>,
   {
-    state?: PosState;
+    posState?: PosState;
     options?: Options;
   } & ComponentProps<"group">
->(({ state: externalState, options, ...props }, ref) => {
-  let internalState = useState(0);
-  const posState = externalState || internalState;
+>(({ posState: externalPosState, options, ...props }, ref) => {
+  let internalPosState = useState(0);
+  const posState = externalPosState || internalPosState;
 
   return (
     <group {...props}>
-      <Inertia ref={ref} state={posState} options={options}>
+      <Inertia ref={ref} posState={posState} options={options}>
         <Panels />
       </Inertia>
     </group>
@@ -197,7 +197,7 @@ const [useCovrflow, Provider] = createRequiredContext<{
   tlPanels: gsap.core.Timeline;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
   tracker: gsap.VelocityTrackerInstance;
-  state: PosState;
+  posState: PosState;
   seat: MutableRefObject<Seat>;
   go: (pos: number) => void;
   feather: (val: number, end?: gsap.InertiaObject["end"]) => void;
@@ -208,15 +208,15 @@ export const Inertia = forwardRef<
   ReturnType<typeof useCovrflow>,
   {
     children: React.ReactNode;
-    state?: PosState;
+    posState?: PosState;
     options?: Options;
   }
->(({ children, state: externalState, options = {} }, ref) => {
+>(({ children, posState: externalPosState, options = {} }, ref) => {
   const opts = merge(options, defaultOptions);
 
-  let internalState = useState(0);
-  const state = externalState || internalState;
-  const [pos, setPos] = state;
+  let internalPosState = useState(0);
+  const posState = externalPosState || internalPosState;
+  const [pos, setPos] = posState;
 
   const seat = useRef<Seat>(null); // `null` mean the seat is available
 
@@ -257,7 +257,7 @@ export const Inertia = forwardRef<
       tlPanels,
       twInertia,
       tracker,
-      state,
+      posState,
       seat,
       go(val: number) {
         console.log("go from %s to %s", pos, val);
@@ -267,7 +267,7 @@ export const Inertia = forwardRef<
       feather,
       options,
     }),
-    [tlPanels, tracker, state, feather, options, pos]
+    [tlPanels, tracker, posState, feather, options, pos]
   );
 
   useImperativeHandle(ref, () => value, [value]);
@@ -294,8 +294,8 @@ function useDrag({
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
   duration?: [number, number];
 } = {}) {
-  const { total, obj, twInertia, state, seat, feather } = useCovrflow();
-  let [pos, setPos] = state;
+  const { total, obj, twInertia, posState, seat, feather } = useCovrflow();
+  let [pos, setPos] = posState;
 
   const bind = useGesture({
     onDragStart({ event }) {
@@ -355,7 +355,7 @@ function Panels() {
   // Tweens
   //
 
-  const { tlPanels: tl, state, options } = useCovrflow();
+  const { tlPanels: tl, posState, options } = useCovrflow();
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
   const panel2Ref = useRef<ElementRef<typeof Box>>(null);
@@ -491,7 +491,7 @@ function Panels() {
   // GUI
   //
 
-  const [pos, setPos] = state;
+  const [pos, setPos] = posState;
 
   useEffect(() => {
     tl.seek(mod(pos)); // seek [0..1]

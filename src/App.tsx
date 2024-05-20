@@ -173,7 +173,7 @@ function Scene() {
     <>
       <Covrflow
         ref={covrflowRef}
-        state={posState}
+        posState={posState}
         options={{
           sensitivity: gui.sensitivity,
           duration: gui.duration,
