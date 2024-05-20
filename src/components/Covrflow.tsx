@@ -165,7 +165,7 @@ const defaultOptions = {
 type Options = typeof defaultOptions;
 
 export const Covrflow = forwardRef<
-  ElementRef<typeof Inertia>,
+  ElementRef<typeof CovrflowProvider>,
   {
     posState?: PosState;
     options?: Options;
@@ -176,9 +176,9 @@ export const Covrflow = forwardRef<
 
   return (
     <group {...props}>
-      <Inertia ref={ref} posState={posState} options={options}>
+      <CovrflowProvider ref={ref} posState={posState} options={options}>
         <Panels />
-      </Inertia>
+      </CovrflowProvider>
     </group>
   );
 });
@@ -204,7 +204,7 @@ const [useCovrflow, Provider] = createRequiredContext<{
   options: Options;
 }>();
 
-export const Inertia = forwardRef<
+export const CovrflowProvider = forwardRef<
   ReturnType<typeof useCovrflow>,
   {
     children: React.ReactNode;
