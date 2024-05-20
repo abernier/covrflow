@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import styled from "@emotion/styled";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Box, useKeyboardControls } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import {
@@ -69,28 +69,16 @@ export default App;
 function Scene() {
   const covrflowRef = useRef<ElementRef<typeof Covrflow>>(null);
 
-  const posState = useState(0);
-  const [pos, setPos] = posState;
-
-  const fooState = useState(0);
-  const [foo, setFoo] = fooState;
-
   const [gui, setGui] = useControls(() => ({
     pos: {
       value: 0,
-      onChange(v) {
-        setPos(v);
-      },
+      disabled: true,
     },
     nav: buttonGroup({
       label: "navigation",
       opts: {
-        prev: (get) => {
-          covrflowRef.current?.go((previous) => previous - 1);
-        },
-        next: (get) => {
-          covrflowRef.current?.go((previous) => previous + 1);
-        },
+        prev: () => covrflowRef.current?.go((val) => val - 1),
+        next: () => covrflowRef.current?.go((val) => val + 1),
       },
     }),
     sensitivity: {
@@ -107,9 +95,10 @@ function Scene() {
     debug: false,
   }));
 
-  useEffect(() => {
-    setGui({ pos });
-  }, [pos, setGui]);
+  // sync coverflow `pos` to GUI
+  useFrame(() => {
+    setGui({ pos: covrflowRef.current?.posRef.current });
+  });
 
   {
     //
@@ -166,8 +155,6 @@ function Scene() {
     <>
       <Covrflow
         ref={covrflowRef}
-        posState={posState}
-        // posTargetState={fooState}
         options={{
           sensitivity: gui.sensitivity,
           duration: gui.duration,

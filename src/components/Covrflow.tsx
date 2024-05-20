@@ -30,6 +30,7 @@ import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
 import { Interactive, useInteraction } from "@react-three/xr";
 import { Vector2 } from "three";
 import merge from "deepmerge";
+import { useFrame } from "@react-three/fiber";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -93,17 +94,8 @@ const createRequiredContext = <T,>() => {
 //
 
 const content = [
-  "#ecfdf5",
-  "#d1fae5",
-  "#a7f3d0",
-  "#6ee7b7",
-  "#34d399",
-  "#10b981",
-  "#059669",
-  "#047857",
-  "#065f46",
-  "#064e3b",
-  "#022c22",
+  0xecfdf5, 0xd1fae5, 0xa7f3d0, 0x6ee7b7, 0x34d399, 0x10b981, 0x059669,
+  0x047857, 0x065f46, 0x064e3b, 0x022c22,
 ].reverse();
 
 const r = 5;
@@ -155,8 +147,6 @@ const STATES = {
 // ██      ██    ██  ██  ██  ██   ██ ██      ██      ██    ██ ██ ███ ██
 //  ██████  ██████    ████   ██   ██ ██      ███████  ██████   ███ ███
 
-type PosState = [number, Dispatch<SetStateAction<number>>];
-
 const defaultOptions = {
   sensitivity: 1 / 200,
   duration: [0.5, 1.5] as [number, number],
@@ -167,19 +157,12 @@ type Options = typeof defaultOptions;
 export const Covrflow = forwardRef<
   ElementRef<typeof CovrflowProvider>,
   {
-    posState?: PosState;
-    posTargetState?: PosState;
     options?: Options;
   } & ComponentProps<"group">
->(({ posState, posTargetState, options, ...props }, ref) => {
+>(({ options, ...props }, ref) => {
   return (
     <group {...props}>
-      <CovrflowProvider
-        ref={ref}
-        posState={posState}
-        posTargetState={posTargetState}
-        options={options}
-      >
+      <CovrflowProvider ref={ref} options={options}>
         <Panels />
       </CovrflowProvider>
     </group>
@@ -200,9 +183,9 @@ type Api = {
   tlPanels: gsap.core.Timeline;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
   tracker: gsap.VelocityTrackerInstance;
-  posState: PosState;
+  posRef: MutableRefObject<number>;
   seat: MutableRefObject<Seat>;
-  go: (cb: (previous: number) => number) => void;
+  go: (cb: (previous: number) => number, damping?: boolean) => void;
   damp: (val: number, end?: gsap.InertiaObject["end"]) => void;
   options: Options;
 };
@@ -213,103 +196,96 @@ export const CovrflowProvider = forwardRef<
   Api,
   {
     children: React.ReactNode;
-    posState?: PosState;
-    posTargetState?: PosState;
     options?: Partial<Options>;
   }
->(
-  (
-    {
-      children,
-      posState: externalPosState,
-      posTargetState: externalPosTargetState,
-      options = {},
+>(({ children, options = {} }, ref) => {
+  console.log("CovrflowProvider");
+
+  const opts = merge(defaultOptions, options, {
+    arrayMerge: (dstArr, srcArr, options) => srcArr, // do not concat arrays (see: https://www.npmjs.com/package/deepmerge#arraymerge-example-overwrite-target-array)
+  });
+
+  const posRef = useRef(0);
+  const posTargetRef = useRef(0);
+
+  const seat = useRef<Seat>(null); // `null` mean the seat is available
+
+  const [tlPanels] = useState(gsap.timeline({ paused: true }));
+
+  const total = useRef(0);
+  const obj = useRef(0);
+  const twInertia = useRef<gsap.core.Tween>();
+  const [tracker] = useState(
+    VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+  );
+
+  const damp = useCallback<Api["damp"]>(
+    (val, end = gsap.utils.snap(1)) => {
+      twInertia.current?.kill(); // cancel previous inertia tween if still active
+
+      total.current = val; // Important: update `total` when dragging ends
+      // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
+      twInertia.current = gsap.to(total, {
+        inertia: {
+          current: {
+            velocity: tracker.get("current"),
+            end,
+          },
+          duration: { min: opts.duration[0], max: opts.duration[1] },
+        },
+        onUpdate() {
+          // console.log("tick");
+          posRef.current = total.current;
+        },
+        onComplete() {
+          posTargetRef.current = total.current;
+        },
+      });
     },
-    ref
-  ) => {
-    const opts = merge(defaultOptions, options, {
-      arrayMerge: (dstArr, srcArr, options) => srcArr, // do not concat arrays (see: https://www.npmjs.com/package/deepmerge#arraymerge-example-overwrite-target-array)
-    });
+    [opts.duration, tracker]
+  );
 
-    let internalPosState = useState(0);
-    const posState = externalPosState || internalPosState;
-    const [pos, setPos] = posState;
+  const go = useCallback<Api["go"]>(
+    (cb, damping = true) => {
+      const previous = posTargetRef.current;
+      posTargetRef.current = cb(previous);
+      const newVal = cb(previous);
+      console.log("go from %s to %s", previous, newVal);
 
-    let internalPosTargetState = useState(0);
-    const posTargetState = externalPosTargetState || internalPosTargetState;
-    const [posTarget, setPosTarget] = posTargetState;
+      if (damping) {
+        damp(posRef.current, () => gsap.utils.snap(1)(newVal));
+      } else {
+        posRef.current = newVal;
+      }
+      //
+    },
+    [damp]
+  );
 
-    const seat = useRef<Seat>(null); // `null` mean the seat is available
+  const value = useMemo(
+    () => ({
+      total,
+      obj,
+      tlPanels,
+      twInertia,
+      tracker,
+      posRef,
+      seat,
+      go,
+      damp,
+      options: opts,
+    }),
+    [tlPanels, tracker, go, damp, opts]
+  );
 
-    const [tlPanels] = useState(gsap.timeline({ paused: true }));
+  useImperativeHandle(ref, () => value, [value]);
 
-    const total = useRef(0);
-    const obj = useRef(0);
-    const twInertia = useRef<gsap.core.Tween>();
-    const [tracker] = useState(
-      VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
-    );
+  useFrame(() => {
+    tlPanels.seek(mod(posRef.current)); // seek [0..1]
+  });
 
-    const damp = useCallback<Api["damp"]>(
-      (val, end = gsap.utils.snap(1)) => {
-        twInertia.current?.kill(); // cancel previous inertia tween if still active
-
-        total.current = val; // Important: update `total` when dragging ends
-        // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-        twInertia.current = gsap.to(total, {
-          inertia: {
-            current: {
-              velocity: tracker.get("current"),
-              end,
-            },
-            duration: { min: opts.duration[0], max: opts.duration[1] },
-          },
-          onUpdate() {
-            // console.log("tick");
-            setPos(total.current);
-          },
-          onComplete() {
-            setPosTarget(total.current);
-          },
-        });
-      },
-      [opts.duration, setPos, setPosTarget, tracker]
-    );
-
-    const go = useCallback<Api["go"]>(
-      (cb) => {
-        setPosTarget((previous) => {
-          const newVal = cb(previous);
-          console.log("go from %s to %s", previous, newVal);
-
-          damp(pos, (n) => gsap.utils.snap(1)(newVal));
-          return newVal;
-        });
-      },
-      [damp, pos, setPosTarget]
-    );
-
-    const value = useMemo(
-      () => ({
-        total,
-        obj,
-        tlPanels,
-        twInertia,
-        tracker,
-        posState,
-        seat,
-        go,
-        damp,
-        options: opts,
-      }),
-      [tlPanels, tracker, posState, go, damp, opts]
-    );
-
-    useImperativeHandle(ref, () => value, [value]);
-
-    return <Provider value={value}>{children}</Provider>;
-  }
-);
+  return <Provider value={value}>{children}</Provider>;
+});
 
 // ██████  ██████   █████   ██████
 // ██   ██ ██   ██ ██   ██ ██
@@ -326,9 +302,7 @@ function useDrag({
 }: {
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
 } = {}) {
-  const { total, obj, twInertia, posState, seat, damp, options } =
-    useCovrflow();
-  let [pos, setPos] = posState;
+  const { total, obj, twInertia, posRef, seat, damp, options } = useCovrflow();
 
   const bind = useGesture({
     onDragStart({ event }) {
@@ -339,7 +313,7 @@ function useDrag({
       seat.current = (event as CustomDragEvent).object;
 
       twInertia.current?.kill(); // cancel previous inertia tween if still active
-      total.current = pos; // Important: update `total` when dragging starts
+      total.current = posRef.current; // Important: update `total` when dragging starts
     },
     onDrag(...args) {
       // console.log("onDrag");
@@ -354,7 +328,7 @@ function useDrag({
       onDrag?.(...args); // callback
 
       obj.current = total.current + mx * options.sensitivity;
-      setPos(obj.current);
+      posRef.current = obj.current;
     },
     onDragEnd(...args) {
       // console.log("onDragEnd");
@@ -384,11 +358,13 @@ function useDrag({
 // ██      ██   ██ ██   ████ ███████ ███████ ███████
 
 function Panels() {
+  console.log("Panels");
+
   //
   // Tweens
   //
 
-  const { tlPanels: tl, posState, options } = useCovrflow();
+  const { tlPanels: tl, posRef, options } = useCovrflow();
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
   const panel2Ref = useRef<ElementRef<typeof Box>>(null);
@@ -524,64 +500,31 @@ function Panels() {
   // GUI
   //
 
-  const [pos, setPos] = posState;
+  //
+  //
+  //
 
-  useEffect(() => {
-    tl.seek(mod(pos)); // seek [0..1]
-  }, [pos, tl]);
-
-  //
-  //
-  //
+  useFrame(() => {
+    const refs = [panel1Ref, panel2Ref, panel3Ref, panel4Ref];
+    refs.forEach((ref, i) => {
+      const color = circular(Math.floor(posRef.current) - i + 2);
+      if (color && ref.current) {
+        const mat = ref.current.material as THREE.MeshStandardMaterial;
+        mat.color.setHex(color);
+      }
+    });
+  });
 
   const size: [number, number, number] = [3, 5, 0.1];
   return (
     <>
       <group position={[0, size[1] / 2 + 0.01, 0]}>
-        <Panel
-          name="backleft"
-          ref={panel1Ref}
-          state="backleft"
-          debug={options.debug}
-          size={size}
-        >
-          <meshStandardMaterial color={circular(Math.floor(pos) - 0 + 2)} />
-        </Panel>
-        <Panel
-          name="left"
-          ref={panel2Ref}
-          state="left"
-          debug={options.debug}
-          size={size}
-        >
-          <meshStandardMaterial color={circular(Math.floor(pos) - 1 + 2)} />
-        </Panel>
-        <Panel
-          name="front"
-          ref={panel3Ref}
-          state="front"
-          debug={options.debug}
-          size={size}
-        >
-          <meshStandardMaterial color={circular(Math.floor(pos) - 2 + 2)} />
-        </Panel>
-        <Panel
-          name="right"
-          ref={panel4Ref}
-          state="right"
-          debug={options.debug}
-          size={size}
-        >
-          <meshStandardMaterial color={circular(Math.floor(pos) - 3 + 2)} />
-        </Panel>
+        <Panel name="backleft" ref={panel1Ref} state="backleft" size={size} />
+        <Panel name="left" ref={panel2Ref} state="left" size={size} />
+        <Panel name="front" ref={panel3Ref} state="front" size={size} />
+        <Panel name="right" ref={panel4Ref} state="right" size={size} />
 
-        <Panel
-          name="backright"
-          state="backright"
-          debug={options.debug}
-          debugOnly
-          size={size}
-        />
+        <Panel name="backright" state="backright" debugOnly size={size} />
       </group>
 
       {options.debug && <Seeker />}
@@ -605,9 +548,15 @@ const Panel = forwardRef<
   }
 >(
   (
-    { state, children, debug, debugOnly = false, size = [3, 5, 0.1], ...props },
+    { state, children, debugOnly = false, size = [3, 5, 0.1], ...props },
     ref
   ) => {
+    console.log("Panel");
+
+    const {
+      options: { debug },
+    } = useCovrflow();
+
     const posRot = {
       position: STATES[state].position,
       rotation: STATES[state].rotation,
