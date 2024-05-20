@@ -162,7 +162,7 @@ const defaultOptions = {
   duration: [0.5, 1.5] as [number, number],
   debug: false,
 };
-type Options = Partial<typeof defaultOptions>;
+type Options = typeof defaultOptions;
 
 export const Covrflow = forwardRef<
   ElementRef<typeof Inertia>,
@@ -209,10 +209,12 @@ export const Inertia = forwardRef<
   {
     children: React.ReactNode;
     posState?: PosState;
-    options?: Options;
+    options?: Partial<Options>;
   }
 >(({ children, posState: externalPosState, options = {} }, ref) => {
-  const opts = merge(options, defaultOptions);
+  const opts = merge(defaultOptions, options, {
+    arrayMerge: (dstArr, srcArr, options) => srcArr, // do not concat arrays (see: https://www.npmjs.com/package/deepmerge#arraymerge-example-overwrite-target-array)
+  });
 
   let internalPosState = useState(0);
   const posState = externalPosState || internalPosState;
@@ -265,9 +267,9 @@ export const Inertia = forwardRef<
         feather(pos, (n) => gsap.utils.snap(1)(val));
       },
       feather,
-      options,
+      options: opts,
     }),
-    [tlPanels, tracker, posState, feather, options, pos]
+    [tlPanels, tracker, posState, feather, opts, pos]
   );
 
   useImperativeHandle(ref, () => value, [value]);
@@ -286,15 +288,12 @@ export const Inertia = forwardRef<
 type CustomDragEvent = EventTypes["drag"] & { object: THREE.Mesh }; // event.object does not exist on `EventTypes["drag"]` natively :/ (asked on: https://discord.com/channels/740090768164651008/740093202987483156/1238080861686206464)
 
 function useDrag({
-  sensitivity = 1 / 200,
   onDrag,
-  duration: [durMin, durMax] = [0.5, 1.5],
 }: {
-  sensitivity?: number;
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
-  duration?: [number, number];
 } = {}) {
-  const { total, obj, twInertia, posState, seat, feather } = useCovrflow();
+  const { total, obj, twInertia, posState, seat, feather, options } =
+    useCovrflow();
   let [pos, setPos] = posState;
 
   const bind = useGesture({
@@ -320,7 +319,7 @@ function useDrag({
 
       onDrag?.(...args); // callback
 
-      obj.current = total.current + mx * sensitivity;
+      obj.current = total.current + mx * options.sensitivity;
       setPos(obj.current);
     },
     onDragEnd(...args) {
@@ -580,11 +579,7 @@ const Panel = forwardRef<
       rotation: STATES[state].rotation,
     };
 
-    const {
-      options: { sensitivity, duration },
-    } = useCovrflow();
-
-    const { bind } = useDrag({ sensitivity, duration });
+    const { bind } = useDrag();
 
     // const [_pointer] = useState(new Vector2());
     // const [_event] = useState({ type: "", data: _pointer });
