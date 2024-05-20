@@ -28,6 +28,10 @@ import { Leva, buttonGroup, useControls } from "leva";
 import { Mesh, Object3D } from "three";
 
 function App() {
+  const gui = useControls({
+    onDemandFrameloop: { label: "onDemand", value: true },
+  });
+
   return (
     <Styled>
       <Leva collapsed />
@@ -41,6 +45,7 @@ function App() {
         //   fov: 55,
         // }}
         //
+        frameloop={gui.onDemandFrameloop ? "demand" : undefined}
       >
         <XR>
           <Controllers />
@@ -70,16 +75,16 @@ export default App;
 function Scene() {
   const covrflowRef = useRef<ElementRef<typeof Covrflow>>(null);
 
-  useEffect(() => {
-    gsap.ticker.remove(gsap.updateRoot);
-  }, []);
-  useFrame(({ clock }) => {
-    gsap.updateRoot(clock.elapsedTime);
-  });
-
   const [gui, setGui] = useControls(() => ({
     pos: {
       value: 0,
+      disabled: true,
+    },
+    velocity: {
+      value: 0,
+      min: -30,
+      max: 30,
+      step: 1,
       disabled: true,
     },
     nav: buttonGroup({
@@ -105,7 +110,10 @@ function Scene() {
 
   // sync coverflow `pos` to GUI
   useFrame(() => {
-    setGui({ pos: covrflowRef.current?.posRef.current });
+    setGui({
+      pos: covrflowRef.current?.posRef.current,
+      velocity: covrflowRef.current?.tracker.current.get("current"),
+    });
   });
 
   {

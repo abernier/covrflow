@@ -7,16 +7,12 @@ import {
   forwardRef,
   useCallback,
   useContext,
-  useEffect,
   useRef,
   useState,
-  Dispatch,
-  SetStateAction,
   useMemo,
   useImperativeHandle,
 } from "react";
 import { Box } from "@react-three/drei";
-import { useControls } from "leva";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
@@ -30,7 +26,7 @@ import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
 import { Interactive, useInteraction } from "@react-three/xr";
 import { Vector2 } from "three";
 import merge from "deepmerge";
-import { useFrame } from "@react-three/fiber";
+import { invalidate, useFrame } from "@react-three/fiber";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -175,18 +171,27 @@ export const Covrflow = forwardRef<
 // ██      ██   ██ ██    ██  ██  ██  ██ ██   ██ ██      ██   ██
 // ██      ██   ██  ██████    ████   ██ ██████  ███████ ██   ██
 
+type Pos = number;
+type PosRef = MutableRefObject<Pos>;
 type Seat = THREE.Mesh | null;
 
 type Api = {
-  total: MutableRefObject<number>;
-  obj: MutableRefObject<number>;
-  tlPanels: gsap.core.Timeline;
+  posRef: PosRef;
+  posTargetRef: PosRef;
+
+  tlPanels: MutableRefObject<gsap.core.Timeline>;
+  seat: MutableRefObject<Seat>;
+
+  inertiaValueRef: PosRef;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
   tracker: MutableRefObject<gsap.VelocityTrackerInstance>;
-  posRef: MutableRefObject<number>;
-  seat: MutableRefObject<Seat>;
-  go: (cb: (prevPosTarget: number) => number, damping?: boolean) => void;
-  damp: (val: number, end?: gsap.InertiaObject["end"]) => void;
+
+  damp: (end?: gsap.InertiaObject["end"]) => void;
+  go: (
+    x: number | ((prevPosTarget: number) => number),
+    damping?: boolean
+  ) => void;
+
   options: Options;
 };
 
@@ -208,37 +213,37 @@ export const CovrflowProvider = forwardRef<
   const posRef = useRef(0);
   const posTargetRef = useRef(0);
 
+  const tlPanels = useRef(gsap.timeline({ paused: true }));
   const seat = useRef<Seat>(null); // `null` mean the seat is available
 
-  const [tlPanels] = useState(gsap.timeline({ paused: true }));
-
-  const total = useRef(0);
-  const obj = useRef(0);
+  const inertiaValueRef = useRef(0);
   const twInertia = useRef<gsap.core.Tween>();
   const tracker = useRef(
-    VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+    VelocityTracker.track(posRef, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
   );
 
   const damp = useCallback<Api["damp"]>(
-    (val, end = gsap.utils.snap(1)) => {
+    (end = gsap.utils.snap(1)) => {
       twInertia.current?.kill(); // cancel previous inertia tween if still active
 
-      total.current = val; // Important: update `total` when dragging ends
+      const refPropName = "current";
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-      twInertia.current = gsap.to(total, {
+      twInertia.current = gsap.fromTo(inertiaValueRef, posRef, {
         inertia: {
-          current: {
-            velocity: tracker.current.get("current"),
+          [refPropName]: {
+            velocity: tracker.current.get(refPropName),
             end,
           },
           duration: { min: opts.duration[0], max: opts.duration[1] },
         },
         onUpdate() {
           // console.log("tick");
-          posRef.current = total.current;
+
+          posRef.current = inertiaValueRef.current;
+          invalidate();
         },
         onComplete() {
-          posTargetRef.current = total.current;
+          posTargetRef.current = inertiaValueRef.current;
         },
       });
     },
@@ -246,42 +251,50 @@ export const CovrflowProvider = forwardRef<
   );
 
   const go = useCallback<Api["go"]>(
-    (cb, damping = true) => {
-      const prevPosTarget = posTargetRef.current;
-      posTargetRef.current = cb(prevPosTarget);
-      const newPosTarget = cb(prevPosTarget);
-      console.log("go from %s to %s", prevPosTarget, newPosTarget);
+    (x, damping = true) => {
+      const newPosTarget =
+        typeof x === "function" ? x(posTargetRef.current) : x;
+
+      console.log("go from %s to %s", posTargetRef.current, newPosTarget);
+      posTargetRef.current = newPosTarget;
 
       if (damping) {
-        damp(posRef.current, () => gsap.utils.snap(1)(newPosTarget));
+        damp(() => gsap.utils.snap(1)(newPosTarget));
       } else {
         posRef.current = newPosTarget;
+        invalidate();
       }
-      //
     },
     [damp]
   );
 
+  // api
   const value = useMemo(
     () => ({
-      total,
-      obj,
+      posRef,
+      posTargetRef,
+
       tlPanels,
+      seat,
+
+      inertiaValueRef,
       twInertia,
       tracker,
-      posRef,
-      seat,
+
       go,
       damp,
+
       options: opts,
     }),
-    [tlPanels, go, damp, opts]
+    [go, damp, opts]
   );
 
   useImperativeHandle(ref, () => value, [value]);
 
+  // sync timeline with pos
   useFrame(() => {
-    tlPanels.seek(mod(posRef.current)); // seek [0..1]
+    const t = mod(posRef.current); // [0..1]
+    tlPanels.current.seek(t);
   });
 
   return <Provider value={value}>{children}</Provider>;
@@ -302,7 +315,15 @@ function useDrag({
 }: {
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
 } = {}) {
-  const { total, obj, twInertia, posRef, seat, damp, options } = useCovrflow();
+  const {
+    inertiaValueRef,
+    twInertia,
+    posRef,
+    posTargetRef,
+    seat,
+    damp,
+    options,
+  } = useCovrflow();
 
   const bind = useGesture({
     onDragStart({ event }) {
@@ -312,8 +333,7 @@ function useDrag({
       if (seat.current !== null) return; // if not => skip
       seat.current = (event as CustomDragEvent).object;
 
-      twInertia.current?.kill(); // cancel previous inertia tween if still active
-      total.current = posRef.current; // Important: update `total` when dragging starts
+      twInertia.current?.kill(); // Cancel previous inertia tween if still active
     },
     onDrag(...args) {
       // console.log("onDrag");
@@ -327,24 +347,20 @@ function useDrag({
 
       onDrag?.(...args); // callback
 
-      obj.current = total.current + mx * options.sensitivity;
-      posRef.current = obj.current;
+      posTargetRef.current = inertiaValueRef.current + mx * options.sensitivity; // Set new target value
+      posRef.current = posTargetRef.current; // Immediately update `pos` to the target
+      invalidate();
     },
-    onDragEnd(...args) {
+    onDragEnd({ movement: [mx], event }) {
       // console.log("onDragEnd");
-
-      const {
-        movement: [mx],
-        event,
-      } = args[0];
 
       // Releasing the seat on "dragend"
       if (seat.current !== (event as CustomDragEvent).object) return;
       seat.current = null;
 
-      if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
+      // if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
-      damp(obj.current);
+      damp();
     },
   });
 
@@ -364,7 +380,7 @@ function Panels() {
   // Tweens
   //
 
-  const { tlPanels: tl, posRef, options } = useCovrflow();
+  const { tlPanels, posRef, options } = useCovrflow();
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
   const panel2Ref = useRef<ElementRef<typeof Box>>(null);
@@ -489,21 +505,18 @@ function Panels() {
     // all
     //
 
-    tl.clear();
-    tl.add(tl1, 0);
-    tl.add(tl2, 0);
-    tl.add(tl3, 0);
-    tl.add(tl4, 0);
+    tlPanels.current.clear();
+    tlPanels.current.add(tl1, 0);
+    tlPanels.current.add(tl2, 0);
+    tlPanels.current.add(tl3, 0);
+    tlPanels.current.add(tl4, 0);
   });
 
   //
-  // GUI
-  //
-
-  //
   //
   //
 
+  // Panels material color
   useFrame(() => {
     const refs = [panel1Ref, panel2Ref, panel3Ref, panel4Ref];
     refs.forEach((ref, i) => {
@@ -518,7 +531,7 @@ function Panels() {
   const size: [number, number, number] = [3, 5, 0.1];
   return (
     <>
-      <group position={[0, size[1] / 2 + 0.01, 0]}>
+      <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
         <Panel name="backleft" ref={panel1Ref} state="backleft" size={size} />
         <Panel name="left" ref={panel2Ref} state="left" size={size} />
         <Panel name="front" ref={panel3Ref} state="front" size={size} />
