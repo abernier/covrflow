@@ -72,7 +72,8 @@ function Scene() {
   const posState = useState(0);
   const [pos, setPos] = posState;
 
-  const [foo, setFoo] = useState(0);
+  const fooState = useState(0);
+  const [foo, setFoo] = fooState;
 
   const [gui, setGui] = useControls(() => ({
     pos: {
@@ -85,18 +86,10 @@ function Scene() {
       label: "navigation",
       opts: {
         prev: (get) => {
-          setFoo((prev) => {
-            const newVal = prev - 1;
-            covrflowRef.current?.go(newVal);
-            return newVal;
-          });
+          covrflowRef.current?.go((previous) => previous - 1);
         },
         next: (get) => {
-          setFoo((prev) => {
-            const newVal = prev + 1;
-            covrflowRef.current?.go(newVal);
-            return newVal;
-          });
+          covrflowRef.current?.go((previous) => previous + 1);
         },
       },
     }),
@@ -174,6 +167,7 @@ function Scene() {
       <Covrflow
         ref={covrflowRef}
         posState={posState}
+        // posTargetState={fooState}
         options={{
           sensitivity: gui.sensitivity,
           duration: gui.duration,

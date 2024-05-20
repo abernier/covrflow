@@ -168,15 +168,18 @@ export const Covrflow = forwardRef<
   ElementRef<typeof CovrflowProvider>,
   {
     posState?: PosState;
+    posTargetState?: PosState;
     options?: Options;
   } & ComponentProps<"group">
->(({ posState: externalPosState, options, ...props }, ref) => {
-  let internalPosState = useState(0);
-  const posState = externalPosState || internalPosState;
-
+>(({ posState, posTargetState, options, ...props }, ref) => {
   return (
     <group {...props}>
-      <CovrflowProvider ref={ref} posState={posState} options={options}>
+      <CovrflowProvider
+        ref={ref}
+        posState={posState}
+        posTargetState={posTargetState}
+        options={options}
+      >
         <Panels />
       </CovrflowProvider>
     </group>
@@ -191,7 +194,7 @@ export const Covrflow = forwardRef<
 
 type Seat = THREE.Mesh | null;
 
-const [useCovrflow, Provider] = createRequiredContext<{
+type Api = {
   total: MutableRefObject<number>;
   obj: MutableRefObject<number>;
   tlPanels: gsap.core.Timeline;
@@ -199,83 +202,111 @@ const [useCovrflow, Provider] = createRequiredContext<{
   tracker: gsap.VelocityTrackerInstance;
   posState: PosState;
   seat: MutableRefObject<Seat>;
-  go: (pos: number) => void;
+  go: (cb: (previous: number) => number) => void;
   damp: (val: number, end?: gsap.InertiaObject["end"]) => void;
   options: Options;
-}>();
+};
+
+const [useCovrflow, Provider] = createRequiredContext<Api>();
 
 export const CovrflowProvider = forwardRef<
-  ReturnType<typeof useCovrflow>,
+  Api,
   {
     children: React.ReactNode;
     posState?: PosState;
+    posTargetState?: PosState;
     options?: Partial<Options>;
   }
->(({ children, posState: externalPosState, options = {} }, ref) => {
-  const opts = merge(defaultOptions, options, {
-    arrayMerge: (dstArr, srcArr, options) => srcArr, // do not concat arrays (see: https://www.npmjs.com/package/deepmerge#arraymerge-example-overwrite-target-array)
-  });
-
-  let internalPosState = useState(0);
-  const posState = externalPosState || internalPosState;
-  const [pos, setPos] = posState;
-
-  const seat = useRef<Seat>(null); // `null` mean the seat is available
-
-  const [tlPanels] = useState(gsap.timeline({ paused: true }));
-
-  const total = useRef(0);
-  const obj = useRef(0);
-  const twInertia = useRef<gsap.core.Tween>();
-  const [tracker] = useState(
-    VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
-  );
-
-  const damp = useCallback(
-    (val: number, end: gsap.InertiaObject["end"] = gsap.utils.snap(1)) => {
-      total.current = val; // Important: update `total` when dragging ends
-      // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-      twInertia.current = gsap.to(total, {
-        inertia: {
-          current: {
-            velocity: tracker.get("current"),
-            end,
-          },
-          duration: { min: opts.duration[0], max: opts.duration[1] },
-        },
-        onUpdate() {
-          // console.log("tick");
-          setPos(total.current);
-        },
-      });
+>(
+  (
+    {
+      children,
+      posState: externalPosState,
+      posTargetState: externalPosTargetState,
+      options = {},
     },
-    [opts.duration, setPos, tracker]
-  );
+    ref
+  ) => {
+    const opts = merge(defaultOptions, options, {
+      arrayMerge: (dstArr, srcArr, options) => srcArr, // do not concat arrays (see: https://www.npmjs.com/package/deepmerge#arraymerge-example-overwrite-target-array)
+    });
 
-  const value = useMemo(
-    () => ({
-      total,
-      obj,
-      tlPanels,
-      twInertia,
-      tracker,
-      posState,
-      seat,
-      go(val: number) {
-        console.log("go from %s to %s", pos, val);
+    let internalPosState = useState(0);
+    const posState = externalPosState || internalPosState;
+    const [pos, setPos] = posState;
+
+    let internalPosTargetState = useState(0);
+    const posTargetState = externalPosTargetState || internalPosTargetState;
+    const [posTarget, setPosTarget] = posTargetState;
+
+    const seat = useRef<Seat>(null); // `null` mean the seat is available
+
+    const [tlPanels] = useState(gsap.timeline({ paused: true }));
+
+    const total = useRef(0);
+    const obj = useRef(0);
+    const twInertia = useRef<gsap.core.Tween>();
+    const [tracker] = useState(
+      VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+    );
+
+    const damp = useCallback<Api["damp"]>(
+      (val, end = gsap.utils.snap(1)) => {
         twInertia.current?.kill(); // cancel previous inertia tween if still active
-        damp(pos, (n) => gsap.utils.snap(1)(val));
+
+        total.current = val; // Important: update `total` when dragging ends
+        // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
+        twInertia.current = gsap.to(total, {
+          inertia: {
+            current: {
+              velocity: tracker.get("current"),
+              end,
+            },
+            duration: { min: opts.duration[0], max: opts.duration[1] },
+          },
+          onUpdate() {
+            // console.log("tick");
+            setPos(total.current);
+          },
+        });
       },
-      damp,
-      options: opts,
-    }),
-    [tlPanels, tracker, posState, damp, opts, pos]
-  );
+      [opts.duration, setPos, tracker]
+    );
 
-  useImperativeHandle(ref, () => value, [value]);
+    const go = useCallback<Api["go"]>(
+      (cb) => {
+        setPosTarget((previous) => {
+          const newVal = cb(previous);
+          console.log("go from %s to %s", previous, newVal);
 
-  return <Provider value={value}>{children}</Provider>;
-});
+          damp(pos, (n) => gsap.utils.snap(1)(newVal));
+          return newVal;
+        });
+      },
+      [damp, pos, setPosTarget]
+    );
+
+    const value = useMemo(
+      () => ({
+        total,
+        obj,
+        tlPanels,
+        twInertia,
+        tracker,
+        posState,
+        seat,
+        go,
+        damp,
+        options: opts,
+      }),
+      [tlPanels, tracker, posState, go, damp, opts]
+    );
+
+    useImperativeHandle(ref, () => value, [value]);
+
+    return <Provider value={value}>{children}</Provider>;
+  }
+);
 
 // ██████  ██████   █████   ██████
 // ██   ██ ██   ██ ██   ██ ██
