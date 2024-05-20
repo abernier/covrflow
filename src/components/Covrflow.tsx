@@ -185,7 +185,7 @@ type Api = {
   tracker: gsap.VelocityTrackerInstance;
   posRef: MutableRefObject<number>;
   seat: MutableRefObject<Seat>;
-  go: (cb: (previous: number) => number, damping?: boolean) => void;
+  go: (cb: (prevPosTarget: number) => number, damping?: boolean) => void;
   damp: (val: number, end?: gsap.InertiaObject["end"]) => void;
   options: Options;
 };
@@ -247,15 +247,15 @@ export const CovrflowProvider = forwardRef<
 
   const go = useCallback<Api["go"]>(
     (cb, damping = true) => {
-      const previous = posTargetRef.current;
-      posTargetRef.current = cb(previous);
-      const newVal = cb(previous);
-      console.log("go from %s to %s", previous, newVal);
+      const prevPosTarget = posTargetRef.current;
+      posTargetRef.current = cb(prevPosTarget);
+      const newPosTarget = cb(prevPosTarget);
+      console.log("go from %s to %s", prevPosTarget, newPosTarget);
 
       if (damping) {
-        damp(posRef.current, () => gsap.utils.snap(1)(newVal));
+        damp(posRef.current, () => gsap.utils.snap(1)(newPosTarget));
       } else {
-        posRef.current = newVal;
+        posRef.current = newPosTarget;
       }
       //
     },
