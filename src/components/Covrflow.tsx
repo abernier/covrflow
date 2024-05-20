@@ -200,7 +200,7 @@ const [useCovrflow, Provider] = createRequiredContext<{
   posState: PosState;
   seat: MutableRefObject<Seat>;
   go: (pos: number) => void;
-  feather: (val: number, end?: gsap.InertiaObject["end"]) => void;
+  damp: (val: number, end?: gsap.InertiaObject["end"]) => void;
   options: Options;
 }>();
 
@@ -231,7 +231,7 @@ export const Inertia = forwardRef<
     VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
   );
 
-  const feather = useCallback(
+  const damp = useCallback(
     (val: number, end: gsap.InertiaObject["end"] = gsap.utils.snap(1)) => {
       total.current = val; // Important: update `total` when dragging ends
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
@@ -264,12 +264,12 @@ export const Inertia = forwardRef<
       go(val: number) {
         console.log("go from %s to %s", pos, val);
         twInertia.current?.kill(); // cancel previous inertia tween if still active
-        feather(pos, (n) => gsap.utils.snap(1)(val));
+        damp(pos, (n) => gsap.utils.snap(1)(val));
       },
-      feather,
+      damp,
       options: opts,
     }),
-    [tlPanels, tracker, posState, feather, opts, pos]
+    [tlPanels, tracker, posState, damp, opts, pos]
   );
 
   useImperativeHandle(ref, () => value, [value]);
@@ -292,7 +292,7 @@ function useDrag({
 }: {
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
 } = {}) {
-  const { total, obj, twInertia, posState, seat, feather, options } =
+  const { total, obj, twInertia, posState, seat, damp, options } =
     useCovrflow();
   let [pos, setPos] = posState;
 
@@ -336,7 +336,7 @@ function useDrag({
 
       if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
-      feather(obj.current);
+      damp(obj.current);
     },
   });
 
