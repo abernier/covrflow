@@ -268,9 +268,12 @@ export const CovrflowProvider = forwardRef<
             // console.log("tick");
             setPos(total.current);
           },
+          onComplete() {
+            setPosTarget(total.current);
+          },
         });
       },
-      [opts.duration, setPos, tracker]
+      [opts.duration, setPos, setPosTarget, tracker]
     );
 
     const go = useCallback<Api["go"]>(
