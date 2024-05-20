@@ -182,7 +182,7 @@ type Api = {
   obj: MutableRefObject<number>;
   tlPanels: gsap.core.Timeline;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
-  tracker: gsap.VelocityTrackerInstance;
+  tracker: MutableRefObject<gsap.VelocityTrackerInstance>;
   posRef: MutableRefObject<number>;
   seat: MutableRefObject<Seat>;
   go: (cb: (prevPosTarget: number) => number, damping?: boolean) => void;
@@ -215,7 +215,7 @@ export const CovrflowProvider = forwardRef<
   const total = useRef(0);
   const obj = useRef(0);
   const twInertia = useRef<gsap.core.Tween>();
-  const [tracker] = useState(
+  const tracker = useRef(
     VelocityTracker.track(obj, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
   );
 
@@ -228,7 +228,7 @@ export const CovrflowProvider = forwardRef<
       twInertia.current = gsap.to(total, {
         inertia: {
           current: {
-            velocity: tracker.get("current"),
+            velocity: tracker.current.get("current"),
             end,
           },
           duration: { min: opts.duration[0], max: opts.duration[1] },
@@ -242,7 +242,7 @@ export const CovrflowProvider = forwardRef<
         },
       });
     },
-    [opts.duration, tracker]
+    [opts.duration]
   );
 
   const go = useCallback<Api["go"]>(
@@ -275,7 +275,7 @@ export const CovrflowProvider = forwardRef<
       damp,
       options: opts,
     }),
-    [tlPanels, tracker, go, damp, opts]
+    [tlPanels, go, damp, opts]
   );
 
   useImperativeHandle(ref, () => value, [value]);
