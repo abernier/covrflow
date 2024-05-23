@@ -29,7 +29,7 @@ import { Mesh, Object3D } from "three";
 
 function App() {
   const gui = useControls({
-    onDemandFrameloop: { label: "onDemand", value: true },
+    onDemandFrameloop: { label: "onDemand", value: false },
   });
 
   return (

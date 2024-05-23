@@ -27,6 +27,7 @@ import { Interactive, useInteraction } from "@react-three/xr";
 import { Vector2 } from "three";
 import merge from "deepmerge";
 import { invalidate, useFrame } from "@react-three/fiber";
+import * as geometry from "maath/geometry";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -528,7 +529,8 @@ function Panels() {
     });
   });
 
-  const size: [number, number, number] = [3, 5, 0.1];
+  const aspect = 9 / 16;
+  const size: [number, number, number] = [3, 3 / aspect, 0.1];
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
@@ -558,10 +560,18 @@ const Panel = forwardRef<
     debug?: boolean;
     debugOnly?: boolean;
     size?: [number, number, number];
+    borderRadius?: number;
   }
 >(
   (
-    { state, children, debugOnly = false, size = [3, 5, 0.1], ...props },
+    {
+      state,
+      children,
+      debugOnly = false,
+      size = [3, 5, 0.1],
+      borderRadius = 0.15,
+      ...props
+    },
     ref
   ) => {
     console.log("Panel");
@@ -581,6 +591,12 @@ const Panel = forwardRef<
     // const [_event] = useState({ type: "", data: _pointer });
 
     // const dragging = useRef(false);
+
+    const roundedPlaneGeometry = useMemo(
+      () =>
+        new geometry.RoundedPlaneGeometry(...size.slice(0, 2), borderRadius),
+      [size, borderRadius]
+    );
 
     return (
       <>
@@ -647,8 +663,7 @@ const Panel = forwardRef<
           //     );
           //   }}
           // >
-          <Box
-            args={size}
+          <mesh
             ref={ref}
             castShadow
             receiveShadow
@@ -656,10 +671,16 @@ const Panel = forwardRef<
             {...props}
             {...(bind() as any)}
           >
+            <primitive object={roundedPlaneGeometry} />
             {children || (
-              <meshStandardMaterial transparent opacity={1} color="white" />
+              <meshStandardMaterial
+                transparent
+                opacity={1}
+                color="white"
+                shadowSide={THREE.DoubleSide}
+              />
             )}
-          </Box>
+          </mesh>
           // </Interactive>
         )}
 
