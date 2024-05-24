@@ -38,9 +38,49 @@ const useGesture = createUseGesture([dragAction, pinchAction]);
 //
 
 function circular(i: number) {
-  return content.at(
-    (i + (Math.floor(content.length / 2) - 1)) % content.length
-  );
+  return circ(content, i);
+}
+
+//
+// circ
+//
+// Returns the element at the circular index in an array, from the middle of the array by default
+//
+// @param i - The index to access, can be positive or negative.
+// @param arr - The array from which to retrieve the element.
+// @param middle - start counting i from the middle (can be false, "lower" or "upper" in case of even arr)?
+//
+// Examples:
+//
+// arrA = ["01.mp4", "02.mp4", "03.mp4", "04.mp4", "05.mp4"]
+// arrB = ["01.mp4", "02.mp4", "03.mp4", "04.mp4"]
+//
+// circ( 0, arrA) => "03.mp4"   // middle element
+// circ(-1, arrA) => "02.mp4"   // 1 element before the middle
+// circ(-2, arrA) => "01.mp4"   // 2 elements before the middle
+// circ(-3, arrA) => "05.mp4"   // 3 elements before the middle
+// circ( 1, arrA) => "04.mp4"   // 1 element after the middle
+//
+// circ(0, arrB) => "02.mp4"            // when arr is even, it takes the "lower" middle element by default
+// circ(0, arrB, "upper") => "03.mp4"   // but we can specify to take the "upper" one
+//
+// circ(0, arrA, false) => "01.mp4"     // we can also specify to not start from the middle
+//
+
+function circ<T>(
+  arr: T[],
+  i: number,
+  middle: "lower" | "upper" | false = "lower"
+) {
+  let centerOffset = 0;
+  if (middle) {
+    const even = arr.length % 2 === 0;
+    centerOffset = Math.floor(
+      arr.length / 2 + (even && middle === "lower" ? -1 : 0)
+    );
+  }
+
+  return arr.at((i + centerOffset) % arr.length) as T;
 }
 
 function arr2vec(arr: [number, number, number]) {
