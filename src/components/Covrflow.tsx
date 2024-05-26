@@ -277,7 +277,7 @@ export const CovrflowProvider = forwardRef<
   const posTargetRef = useRef(0);
 
   // frameloop="demand" https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance#on-demand-rendering
-  // useEffect(() => invalidate(), [pos]);
+  useEffect(() => invalidate(), [pos]);
 
   const tlPanels = useRef(gsap.timeline({ paused: true }));
   const seat = useRef<Seat>(null); // `null` mean the seat is available
@@ -310,7 +310,7 @@ export const CovrflowProvider = forwardRef<
             duration: { min: opts.duration[0], max: opts.duration[1] },
           },
           onUpdate() {
-            console.log("tick", inertiaValueRef.current);
+            // console.log("tick", inertiaValueRef.current);
 
             setPos(inertiaValueRef.current);
           },
@@ -841,12 +841,12 @@ const Panel = forwardRef<
                   />
                 </Suspense>
               ) : (
-                <meshStandardMaterial
-                  transparent
-                  opacity={1}
+              <meshStandardMaterial
+                transparent
+                opacity={1}
                   color="green"
-                  shadowSide={THREE.DoubleSide}
-                />
+                shadowSide={THREE.DoubleSide}
+              />
               ))}
           </mesh>
           // </Interactive>
