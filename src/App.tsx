@@ -75,6 +75,14 @@ export default App;
 function Scene() {
   const covrflowRef = useRef<ElementRef<typeof Covrflow>>(null);
 
+  // useEffect(() => {
+  //   const updateRoot = gsap.updateRoot;
+  //   gsap.ticker.remove(updateRoot);
+  // }, []);
+  // useFrame(({ clock }) => {
+  //   // gsap.updateRoot(clock.elapsedTime);
+  // });
+
   const [gui, setGui] = useControls(() => ({
     pos: {
       value: 0,
@@ -111,8 +119,8 @@ function Scene() {
   // sync coverflow `pos` to GUI
   useFrame(() => {
     setGui({
-      pos: covrflowRef.current?.posRef.current,
-      velocity: covrflowRef.current?.tracker.current.get("current"),
+      pos: covrflowRef.current?.posState[0],
+      velocity: covrflowRef.current?.trackerRef.current.get("current"),
     });
   });
 

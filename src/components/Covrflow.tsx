@@ -11,8 +11,12 @@ import {
   useState,
   useMemo,
   useImperativeHandle,
+  Dispatch,
+  SetStateAction,
+  useEffect,
+  Suspense,
 } from "react";
-import { Box } from "@react-three/drei";
+import { Box, useVideoTexture } from "@react-three/drei";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
@@ -135,6 +139,23 @@ const content = [
   0x047857, 0x065f46, 0x064e3b, 0x022c22,
 ].reverse();
 
+// List of films from https://gist.github.com/jsturgis/3b19447b304616f18657
+const films = [
+  // "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4",
+  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
+  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
+  "01.mp4",
+  "02.mp4",
+  "03.mp4",
+  "04.mp4",
+  "05.mp4",
+];
+
 const r = 5;
 const STATES = {
   backleft: {
@@ -217,15 +238,16 @@ type PosRef = MutableRefObject<Pos>;
 type Seat = THREE.Mesh | null;
 
 type Api = {
-  posRef: PosRef;
+  posState: [Pos, Dispatch<SetStateAction<Pos>>];
   posTargetRef: PosRef;
+  posFloored: number;
 
   tlPanels: MutableRefObject<gsap.core.Timeline>;
   seat: MutableRefObject<Seat>;
 
   inertiaValueRef: PosRef;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
-  tracker: MutableRefObject<gsap.VelocityTrackerInstance>;
+  trackerRef: MutableRefObject<gsap.VelocityTrackerInstance>;
 
   damp: (end?: gsap.InertiaObject["end"]) => void;
   go: (
@@ -245,50 +267,60 @@ export const CovrflowProvider = forwardRef<
     options?: Partial<Options>;
   }
 >(({ children, options = {} }, ref) => {
-  console.log("CovrflowProvider");
+  // console.log("CovrflowProvider");
 
   const opts = merge(defaultOptions, options, {
     arrayMerge: (dstArr, srcArr, options) => srcArr, // do not concat arrays (see: https://www.npmjs.com/package/deepmerge#arraymerge-example-overwrite-target-array)
   });
 
-  const posRef = useRef(0);
+  const [pos, setPos] = useState(0);
   const posTargetRef = useRef(0);
+
+  // frameloop="demand" https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance#on-demand-rendering
+  // useEffect(() => invalidate(), [pos]);
 
   const tlPanels = useRef(gsap.timeline({ paused: true }));
   const seat = useRef<Seat>(null); // `null` mean the seat is available
 
   const inertiaValueRef = useRef(0);
   const twInertia = useRef<gsap.core.Tween>();
-  const tracker = useRef(
-    VelocityTracker.track(posRef, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+
+  const inertiaTrackedPosRef = useRef(0);
+  useEffect(() => void (inertiaTrackedPosRef.current = pos), [pos]); // copy of pos into a ref for the need of the tracker
+  const trackerRef = useRef(
+    VelocityTracker.track(inertiaTrackedPosRef, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
   );
 
   const damp = useCallback<Api["damp"]>(
     (end = gsap.utils.snap(1)) => {
+      console.log("damp", pos, end, opts.duration);
       twInertia.current?.kill(); // cancel previous inertia tween if still active
 
-      const refPropName = "current";
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-      twInertia.current = gsap.fromTo(inertiaValueRef, posRef, {
-        inertia: {
-          [refPropName]: {
-            velocity: tracker.current.get(refPropName),
-            end,
+      twInertia.current = gsap.fromTo(
+        inertiaValueRef,
+        { current: pos }, // from
+        // to
+        {
+          inertia: {
+            current: {
+              velocity: trackerRef.current.get("current"),
+              end,
+            },
+            duration: { min: opts.duration[0], max: opts.duration[1] },
           },
-          duration: { min: opts.duration[0], max: opts.duration[1] },
-        },
-        onUpdate() {
-          // console.log("tick");
+          onUpdate() {
+            console.log("tick", inertiaValueRef.current);
 
-          posRef.current = inertiaValueRef.current;
-          invalidate();
-        },
-        onComplete() {
-          posTargetRef.current = inertiaValueRef.current;
-        },
-      });
+            setPos(inertiaValueRef.current);
+          },
+          onComplete() {
+            posTargetRef.current = inertiaValueRef.current;
+          },
+        }
+      );
     },
-    [opts.duration]
+    [opts.duration, pos]
   );
 
   const go = useCallback<Api["go"]>(
@@ -296,47 +328,55 @@ export const CovrflowProvider = forwardRef<
       const newPosTarget =
         typeof x === "function" ? x(posTargetRef.current) : x;
 
-      console.log("go from %s to %s", posTargetRef.current, newPosTarget);
+      console.log(
+        "navigating from %s to %s",
+        posTargetRef.current,
+        newPosTarget
+      );
       posTargetRef.current = newPosTarget;
 
       if (damping) {
         damp(() => gsap.utils.snap(1)(newPosTarget));
       } else {
-        posRef.current = newPosTarget;
-        invalidate();
+        setPos(newPosTarget);
       }
     },
     [damp]
   );
 
+  const [posFloored, setPosFloored] = useState(Math.floor(pos));
+  useEffect(() => {
+    // posFloored
+    const _pos = Math.floor(pos);
+    if (posFloored !== _pos) {
+      console.log("pos has changed from %s to %s", posFloored, _pos);
+      setPosFloored(_pos);
+    }
+  }, [pos, posFloored]);
+
   // api
   const value = useMemo(
     () => ({
-      posRef,
+      posState: [pos, setPos],
       posTargetRef,
+      posFloored,
 
       tlPanels,
       seat,
 
       inertiaValueRef,
       twInertia,
-      tracker,
+      trackerRef,
 
       go,
       damp,
 
       options: opts,
     }),
-    [go, damp, opts]
-  );
+    [pos, posFloored, go, damp, opts]
+  ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
-
-  // sync timeline with pos
-  useFrame(() => {
-    const t = mod(posRef.current); // [0..1]
-    tlPanels.current.seek(t);
-  });
 
   return <Provider value={value}>{children}</Provider>;
 });
@@ -359,7 +399,7 @@ function useDrag({
   const {
     inertiaValueRef,
     twInertia,
-    posRef,
+    posState: [, setPos],
     posTargetRef,
     seat,
     damp,
@@ -389,8 +429,7 @@ function useDrag({
       onDrag?.(...args); // callback
 
       posTargetRef.current = inertiaValueRef.current + mx * options.sensitivity; // Set new target value
-      posRef.current = posTargetRef.current; // Immediately update `pos` to the target
-      invalidate();
+      setPos(posTargetRef.current); // Immediately update `pos` to the target
     },
     onDragEnd({ movement: [mx], event }) {
       // console.log("onDragEnd");
@@ -414,14 +453,46 @@ function useDrag({
 // ██      ██   ██ ██  ██ ██ ██      ██           ██
 // ██      ██   ██ ██   ████ ███████ ███████ ███████
 
+function VideoMaterial({
+  src,
+  setVideo,
+  ...props
+}: {
+  src: string;
+  setVideo?: Dispatch<SetStateAction<HTMLVideoElement | undefined>>;
+} & ComponentProps<"meshStandardMaterial">) {
+  const texture = useVideoTexture(src, {
+    // start: false
+  });
+  // texture.wrapS = THREE.RepeatWrapping;
+  // texture.wrapT = THREE.RepeatWrapping;
+  // texture.repeat.x = -1;
+  // texture.offset.x = 1;
+
+  // setVideo?.(texture.image);
+
+  return <meshStandardMaterial map={texture} {...props} />;
+}
+
 function Panels() {
-  console.log("Panels");
+  // console.log("Panels");
+
+  const {
+    tlPanels,
+    posState: [pos],
+    options,
+    posFloored,
+  } = useCovrflow();
+
+  // sync timeline with pos
+  useEffect(() => {
+    const t = mod(pos); // [0..1]
+    tlPanels.current.seek(t);
+  }, [pos, tlPanels]);
 
   //
   // Tweens
   //
-
-  const { tlPanels, posRef, options } = useCovrflow();
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
   const panel2Ref = useRef<ElementRef<typeof Box>>(null);
@@ -558,26 +629,62 @@ function Panels() {
   //
 
   // Panels material color
-  useFrame(() => {
-    const refs = [panel1Ref, panel2Ref, panel3Ref, panel4Ref];
-    refs.forEach((ref, i) => {
-      const color = circular(Math.floor(posRef.current) - i + 2);
-      if (color && ref.current) {
-        const mat = ref.current.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(color);
-      }
-    });
-  });
+  // useEffect(() => {
+  //   const refs = [panel1Ref, panel2Ref, panel3Ref, panel4Ref];
+  //   refs.forEach((ref, i) => {
+  //     const color = circular(Math.floor(pos) - i + 2);
+  //     if (color && ref.current) {
+  //       const mat = ref.current.material as THREE.MeshStandardMaterial;
+  //       mat.color.setHex(color);
+  //     }
+  //   });
+  // }, [pos]);
+
+  const srcs = useMemo(() => {
+    const ret = [
+      circ(films, posFloored + 2), // backleft
+      circ(films, posFloored + 1), // left
+      circ(films, posFloored + 0), // front
+      circ(films, posFloored - 1), // right
+    ];
+    console.log("srcs", ret);
+
+    return ret;
+  }, [posFloored]);
 
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
-        <Panel name="backleft" ref={panel1Ref} state="backleft" size={size} />
-        <Panel name="left" ref={panel2Ref} state="left" size={size} />
-        <Panel name="front" ref={panel3Ref} state="front" size={size} />
-        <Panel name="right" ref={panel4Ref} state="right" size={size} />
+        <Panel
+          name="backleft"
+          ref={panel1Ref}
+          state="backleft"
+          size={size}
+          src={srcs[0]}
+        />
+        <Panel
+          name="left"
+          ref={panel2Ref}
+          state="left"
+          size={size}
+          src={srcs[1]}
+        />
+        <Panel
+          name="front"
+          ref={panel3Ref}
+          state="front"
+          size={size}
+          src={srcs[2]}
+        />
+        <Panel
+          name="right"
+          ref={panel4Ref}
+          state="right"
+          size={size}
+          src={srcs[3]}
+        />
 
         <Panel name="backright" state="backright" debugOnly size={size} />
       </group>
@@ -601,6 +708,7 @@ const Panel = forwardRef<
     debugOnly?: boolean;
     size?: [number, number, number];
     borderRadius?: number;
+    src?: string;
   }
 >(
   (
@@ -610,11 +718,21 @@ const Panel = forwardRef<
       debugOnly = false,
       size = [3, 5, 0.1],
       borderRadius = 0.15,
+      src,
       ...props
     },
     ref
   ) => {
-    console.log("Panel");
+    // console.log("Panel");
+
+    // const [video, setVideo] = useState<HTMLVideoElement>();
+    // useEffect(() => {
+    //   console.log(video, video?.currentTime);
+    //   return () => {
+    //     console.log("pausing", video?.currentTime);
+    //     // video?.pause();
+    //   };
+    // }, [video]);
 
     const {
       options: { debug },
@@ -712,14 +830,24 @@ const Panel = forwardRef<
             {...(bind() as any)}
           >
             <primitive object={roundedPlaneGeometry} />
-            {children || (
-              <meshStandardMaterial
-                transparent
-                opacity={1}
-                color="white"
-                shadowSide={THREE.DoubleSide}
-              />
-            )}
+            {children ||
+              (src ? (
+                <Suspense>
+                  <VideoMaterial
+                    src={src}
+                    // setVideo={setVideo}
+                    shadowSide={THREE.DoubleSide}
+                    // toneMapped={false}
+                  />
+                </Suspense>
+              ) : (
+                <meshStandardMaterial
+                  transparent
+                  opacity={1}
+                  color="green"
+                  shadowSide={THREE.DoubleSide}
+                />
+              ))}
           </mesh>
           // </Interactive>
         )}
