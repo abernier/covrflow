@@ -51,16 +51,11 @@ function App() {
           <Controllers />
           <Hands />
 
-          <Physics
-            // debug
-            gravity={[0, -60, 0]}
-            // timeStep={1 / 60}
-            //
-          >
-            <Layout>
-              <Scene />
-            </Layout>
-          </Physics>
+          {/* <Physics gravity={[0, -60, 0]}> */}
+          <Layout>
+            <Scene />
+          </Layout>
+          {/* </Physics> */}
         </XR>
       </Canvas>
     </Styled>

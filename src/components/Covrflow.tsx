@@ -141,19 +141,19 @@ const content = [
 
 // List of films from https://gist.github.com/jsturgis/3b19447b304616f18657
 const films = [
-  // "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4",
-  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
-  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-  // "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
-  "01.mp4",
-  "02.mp4",
-  "03.mp4",
-  "04.mp4",
-  "05.mp4",
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
+  // "01.mp4",
+  // "02.mp4",
+  // "03.mp4",
+  // "04.mp4",
+  // "05.mp4",
 ];
 
 const r = 5;
@@ -294,7 +294,6 @@ export const CovrflowProvider = forwardRef<
 
   const damp = useCallback<Api["damp"]>(
     (end = gsap.utils.snap(1)) => {
-      console.log("damp", pos, end, opts.duration);
       twInertia.current?.kill(); // cancel previous inertia tween if still active
 
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
@@ -454,69 +453,6 @@ function useDrag({
 // ██      ██   ██ ██  ██ ██ ██      ██           ██
 // ██      ██   ██ ██   ████ ███████ ███████ ███████
 
-function VideoMaterial({
-  src,
-  meshAspect,
-  objectFit = "cover",
-  videoTextureProps: {
-    start = false,
-    preload = "auto",
-    ...videoTextureProps
-  } = {},
-  ...props
-}: {
-  src: string;
-  meshAspect?: number;
-  objectFit?: "cover" | "contain";
-  videoTextureProps: Parameters<typeof useVideoTexture>[1];
-} & ComponentProps<"meshStandardMaterial">) {
-  const tex = useVideoTexture(src, { start, preload, ...videoTextureProps });
-
-  const video = tex.image as HTMLVideoElement;
-
-  useEffect(() => {
-    if (video) {
-      if (start) {
-        video.play();
-      } else {
-        video.pause();
-      }
-    }
-  }, [start, video]);
-
-  // Mettez à jour la matrice UV de la texture lorsque la vidéo est chargée
-  useEffect(() => {
-    if (video && meshAspect) {
-      const r = video.videoWidth / video.videoHeight;
-      const R = meshAspect;
-
-      // Cover/contain texture https://stackoverflow.com/a/78535892/133327
-      if (objectFit === "cover") {
-        if (r > R) {
-          tex.repeat.x = R / r; // Scale the texture width to cover the container's width
-          tex.repeat.y = 1; // Keep the texture height at 100%
-        } else {
-          tex.repeat.x = 1; // Keep the texture width at 100%
-          tex.repeat.y = r / R; // Scale the texture height to cover the container's height
-        }
-      } else {
-        if (r > R) {
-          tex.repeat.x = 1; // Keep the texture width at 100%
-          tex.repeat.y = r / R; // Scale the texture height to fit within the container's height
-        } else {
-          tex.repeat.x = R / r; // Scale the texture width to fit within the container's width
-          tex.repeat.y = 1; // Keep the texture height at 100%
-        }
-      }
-
-      tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
-      tex.offset.x = (1 - tex.repeat.x) / 2; // Center the texture horizontally
-    }
-  }, [meshAspect, objectFit, tex, video]);
-
-  return <meshStandardMaterial map={tex} {...props} />;
-}
-
 function Panels() {
   // console.log("Panels");
 
@@ -542,7 +478,14 @@ function Panels() {
   const panel3Ref = useRef<ElementRef<typeof Box>>(null);
   const panel4Ref = useRef<ElementRef<typeof Box>>(null);
 
+  const [videoPanel1, setVideoPanel1] = useState<HTMLVideoElement | null>(null);
+  const [videoPanel2, setVideoPanel2] = useState<HTMLVideoElement | null>(null);
+  const [videoPanel3, setVideoPanel3] = useState<HTMLVideoElement | null>(null);
+  const [videoPanel4, setVideoPanel4] = useState<HTMLVideoElement | null>(null);
+
   const { contextSafe } = useGSAP(() => {
+    console.log("useGSAP");
+
     if (
       !panel1Ref.current ||
       !panel2Ref.current ||
@@ -665,10 +608,10 @@ function Panels() {
     tlPanels.current.add(tl2, 0);
     tlPanels.current.add(tl3, 0);
     tlPanels.current.add(tl4, 0);
-  });
+  }, [videoPanel1, videoPanel2, videoPanel3, videoPanel4]);
 
   //
-  //
+  // Materials
   //
 
   // Panels material color
@@ -706,13 +649,20 @@ function Panels() {
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
-        <Panel ref={panel1Ref} state="backleft" size={size} src={srcs[0]} />
+        <Panel
+          ref={panel1Ref}
+          state="backleft"
+          size={size}
+          src={srcs[0]}
+          setVideo={setVideoPanel1}
+        />
         <Panel
           ref={panel2Ref}
           state="left"
           size={size}
           src={srcs[1]}
           startVideo={centralVideo === "left"}
+          setVideo={setVideoPanel2}
         />
         <Panel
           ref={panel3Ref}
@@ -720,8 +670,15 @@ function Panels() {
           size={size}
           src={srcs[2]}
           startVideo={centralVideo === "front"}
+          setVideo={setVideoPanel3}
         />
-        <Panel ref={panel4Ref} state="right" size={size} src={srcs[3]} />
+        <Panel
+          ref={panel4Ref}
+          state="right"
+          size={size}
+          src={srcs[3]}
+          setVideo={setVideoPanel4}
+        />
 
         <Panel state="backright" debugOnly size={size} />
       </group>
@@ -747,6 +704,7 @@ const Panel = forwardRef<
     borderRadius?: number;
     src?: string;
     startVideo?: boolean;
+    setVideo?: Dispatch<SetStateAction<HTMLVideoElement | null>>;
   }
 >(
   (
@@ -758,6 +716,7 @@ const Panel = forwardRef<
       borderRadius = 0.15,
       src,
       startVideo = false,
+      setVideo,
       ...props
     },
     ref
@@ -879,6 +838,7 @@ const Panel = forwardRef<
                     meshAspect={size[0] / size[1]}
                     objectFit="cover"
                     videoTextureProps={{ start: startVideo }}
+                    setVideo={setVideo}
                   />
                 </Suspense>
               ) : (
@@ -897,6 +857,92 @@ const Panel = forwardRef<
     );
   }
 );
+
+// ██    ██ ██ ██████  ███████  ██████  ███    ███  █████  ████████ ███████ ██████  ██  █████  ██
+// ██    ██ ██ ██   ██ ██      ██    ██ ████  ████ ██   ██    ██    ██      ██   ██ ██ ██   ██ ██
+// ██    ██ ██ ██   ██ █████   ██    ██ ██ ████ ██ ███████    ██    █████   ██████  ██ ███████ ██
+//  ██  ██  ██ ██   ██ ██      ██    ██ ██  ██  ██ ██   ██    ██    ██      ██   ██ ██ ██   ██ ██
+//   ████   ██ ██████  ███████  ██████  ██      ██ ██   ██    ██    ███████ ██   ██ ██ ██   ██ ███████
+
+function VideoMaterial({
+  src,
+  setVideo,
+  meshAspect,
+  objectFit = "cover",
+  videoTextureProps: {
+    start = false,
+    preload = "auto",
+    ...videoTextureProps
+  } = {},
+  ...props
+}: {
+  src: string;
+  setVideo?: Dispatch<SetStateAction<HTMLVideoElement | null>>;
+  meshAspect?: number;
+  objectFit?: "cover" | "contain";
+  videoTextureProps: Parameters<typeof useVideoTexture>[1];
+} & ComponentProps<"meshStandardMaterial">) {
+  const tex = useVideoTexture(src, {
+    start,
+    preload,
+    // unsuspend: "canplaythrough",
+    onloadedmetadata(e) {
+      console.log("onloadedmetadata", e);
+
+      const video = e.target as HTMLVideoElement;
+      if (!video) return;
+
+      video.currentTime = 30;
+
+      setVideo?.(video);
+    },
+    ...videoTextureProps,
+  });
+
+  const video = tex.image as HTMLVideoElement;
+
+  useEffect(() => {
+    if (video) {
+      if (start) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    }
+  }, [start, video]);
+
+  // Mettez à jour la matrice UV de la texture lorsque la vidéo est chargée
+  useEffect(() => {
+    if (video && meshAspect) {
+      const r = video.videoWidth / video.videoHeight;
+      const R = meshAspect;
+
+      // Cover/contain texture https://stackoverflow.com/a/78535892/133327
+      if (objectFit === "cover") {
+        if (r > R) {
+          tex.repeat.x = R / r; // Scale the texture width to cover the container's width
+          tex.repeat.y = 1; // Keep the texture height at 100%
+        } else {
+          tex.repeat.x = 1; // Keep the texture width at 100%
+          tex.repeat.y = r / R; // Scale the texture height to cover the container's height
+        }
+      } else {
+        if (r > R) {
+          tex.repeat.x = 1; // Keep the texture width at 100%
+          tex.repeat.y = r / R; // Scale the texture height to fit within the container's height
+        } else {
+          tex.repeat.x = R / r; // Scale the texture width to fit within the container's width
+          tex.repeat.y = 1; // Keep the texture height at 100%
+        }
+      }
+
+      tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
+      tex.offset.x = (1 - tex.repeat.x) / 2; // Center the texture horizontally
+    }
+  }, [meshAspect, objectFit, tex, video]);
+
+  return <meshStandardMaterial map={tex} {...props} />;
+}
 
 // ███████ ███████ ███████ ██   ██ ███████ ██████
 // ██      ██      ██      ██  ██  ██      ██   ██
