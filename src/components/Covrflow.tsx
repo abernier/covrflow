@@ -157,6 +157,7 @@ const films = [
 ];
 
 const r = 5;
+const TRANSLUCENCY = 0;
 const STATES = {
   backleft: {
     position: [
@@ -165,7 +166,7 @@ const STATES = {
       -1.5 * r * Math.sin(Math.PI / 3),
     ],
     rotation: [0, Math.PI / 3, 0],
-    opacity: 0,
+    opacity: TRANSLUCENCY,
   },
   left: {
     position: [-r * Math.cos(Math.PI / 3), 0, -r * Math.sin(Math.PI / 3)],
@@ -189,7 +190,7 @@ const STATES = {
       -1.5 * r * Math.sin(Math.PI / 3),
     ],
     rotation: [0, -Math.PI / 3, 0],
-    opacity: 0,
+    opacity: TRANSLUCENCY,
   },
 } satisfies {
   [k in "backleft" | "left" | "front" | "right" | "backright"]: {
@@ -455,51 +456,63 @@ function useDrag({
 
 function VideoMaterial({
   src,
-  setVideo,
   meshAspect,
   objectFit = "cover",
+  videoTextureProps: {
+    start = false,
+    preload = "auto",
+    ...videoTextureProps
+  } = {},
   ...props
 }: {
   src: string;
-  setVideo?: Dispatch<SetStateAction<HTMLVideoElement | undefined>>;
   meshAspect?: number;
   objectFit?: "cover" | "contain";
+  videoTextureProps: Parameters<typeof useVideoTexture>[1];
 } & ComponentProps<"meshStandardMaterial">) {
-  const tex = useVideoTexture(src);
+  const tex = useVideoTexture(src, { start, preload, ...videoTextureProps });
+
+  const video = tex.image as HTMLVideoElement;
+
+  useEffect(() => {
+    if (video) {
+      if (start) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    }
+  }, [start, video]);
 
   // Mettez à jour la matrice UV de la texture lorsque la vidéo est chargée
   useEffect(() => {
-    if (tex.image && meshAspect) {
-      const r = tex.image.videoWidth / tex.image.videoHeight;
+    if (video && meshAspect) {
+      const r = video.videoWidth / video.videoHeight;
       const R = meshAspect;
 
+      // Cover/contain texture https://stackoverflow.com/a/78535892/133327
       if (objectFit === "cover") {
         if (r > R) {
           tex.repeat.x = R / r; // Scale the texture width to cover the container's width
           tex.repeat.y = 1; // Keep the texture height at 100%
-
-          tex.offset.y = 0; // No vertical offset needed
         } else {
           tex.repeat.x = 1; // Keep the texture width at 100%
           tex.repeat.y = r / R; // Scale the texture height to cover the container's height
-          tex.offset.x = 0; // No horizontal offset needed
-          tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
         }
       } else {
         if (r > R) {
           tex.repeat.x = 1; // Keep the texture width at 100%
           tex.repeat.y = r / R; // Scale the texture height to fit within the container's height
-          tex.offset.x = 0; // No horizontal offset needed
-          tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
         } else {
           tex.repeat.x = R / r; // Scale the texture width to fit within the container's width
           tex.repeat.y = 1; // Keep the texture height at 100%
-          tex.offset.x = (1 - tex.repeat.x) / 2; // Center the texture horizontally
-          tex.offset.y = 0; // No vertical offset needed
         }
       }
+
+      tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
+      tex.offset.x = (1 - tex.repeat.x) / 2; // Center the texture horizontally
     }
-  }, [meshAspect, objectFit, tex]);
+  }, [meshAspect, objectFit, tex, video]);
 
   return <meshStandardMaterial map={tex} {...props} />;
 }
@@ -682,41 +695,35 @@ function Panels() {
     return ret;
   }, [posFloored]);
 
+  // Determine the most "central" video
+  const centralVideo = useMemo(
+    () => (mod(pos) > 0.5 ? "left" : "front"),
+    [pos]
+  );
+
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
+        <Panel ref={panel1Ref} state="backleft" size={size} src={srcs[0]} />
         <Panel
-          name="backleft"
-          ref={panel1Ref}
-          state="backleft"
-          size={size}
-          src={srcs[0]}
-        />
-        <Panel
-          name="left"
           ref={panel2Ref}
           state="left"
           size={size}
           src={srcs[1]}
+          startVideo={centralVideo === "left"}
         />
         <Panel
-          name="front"
           ref={panel3Ref}
           state="front"
           size={size}
           src={srcs[2]}
+          startVideo={centralVideo === "front"}
         />
-        <Panel
-          name="right"
-          ref={panel4Ref}
-          state="right"
-          size={size}
-          src={srcs[3]}
-        />
+        <Panel ref={panel4Ref} state="right" size={size} src={srcs[3]} />
 
-        <Panel name="backright" state="backright" debugOnly size={size} />
+        <Panel state="backright" debugOnly size={size} />
       </group>
 
       {options.debug && <Seeker />}
@@ -739,6 +746,7 @@ const Panel = forwardRef<
     size?: [number, number, number];
     borderRadius?: number;
     src?: string;
+    startVideo?: boolean;
   }
 >(
   (
@@ -749,20 +757,12 @@ const Panel = forwardRef<
       size = [3, 5, 0.1],
       borderRadius = 0.15,
       src,
+      startVideo = false,
       ...props
     },
     ref
   ) => {
     // console.log("Panel");
-
-    // const [video, setVideo] = useState<HTMLVideoElement>();
-    // useEffect(() => {
-    //   console.log(video, video?.currentTime);
-    //   return () => {
-    //     console.log("pausing", video?.currentTime);
-    //     // video?.pause();
-    //   };
-    // }, [video]);
 
     const {
       options: { debug },
@@ -865,11 +865,11 @@ const Panel = forwardRef<
                 <Suspense>
                   <VideoMaterial
                     src={src}
-                    // setVideo={setVideo}
                     shadowSide={THREE.DoubleSide}
                     // toneMapped={false}
                     meshAspect={size[0] / size[1]}
                     objectFit="cover"
+                    videoTextureProps={{ start: startVideo }}
                   />
                 </Suspense>
               ) : (
