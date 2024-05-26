@@ -111,8 +111,8 @@ function Scene() {
   // sync coverflow `pos` to GUI
   useFrame(() => {
     setGui({
-      pos: covrflowRef.current?.posRef.current,
-      velocity: covrflowRef.current?.tracker.current.get("current"),
+      pos: covrflowRef.current?.posState[0],
+      velocity: covrflowRef.current?.trackerRef.current.get("current"),
     });
   });
 

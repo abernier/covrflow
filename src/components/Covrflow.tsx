@@ -11,6 +11,9 @@ import {
   useState,
   useMemo,
   useImperativeHandle,
+  Dispatch,
+  SetStateAction,
+  useEffect,
 } from "react";
 import { Box } from "@react-three/drei";
 import gsap from "gsap";
@@ -217,7 +220,7 @@ type PosRef = MutableRefObject<Pos>;
 type Seat = THREE.Mesh | null;
 
 type Api = {
-  posRef: PosRef;
+  posState: [Pos, Dispatch<SetStateAction<Pos>>];
   posTargetRef: PosRef;
 
   tlPanels: MutableRefObject<gsap.core.Timeline>;
@@ -225,7 +228,7 @@ type Api = {
 
   inertiaValueRef: PosRef;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
-  tracker: MutableRefObject<gsap.VelocityTrackerInstance>;
+  trackerRef: MutableRefObject<gsap.VelocityTrackerInstance>;
 
   damp: (end?: gsap.InertiaObject["end"]) => void;
   go: (
@@ -245,50 +248,59 @@ export const CovrflowProvider = forwardRef<
     options?: Partial<Options>;
   }
 >(({ children, options = {} }, ref) => {
-  console.log("CovrflowProvider");
+  // console.log("CovrflowProvider");
 
   const opts = merge(defaultOptions, options, {
     arrayMerge: (dstArr, srcArr, options) => srcArr, // do not concat arrays (see: https://www.npmjs.com/package/deepmerge#arraymerge-example-overwrite-target-array)
   });
 
-  const posRef = useRef(0);
+  const [pos, setPos] = useState(0);
   const posTargetRef = useRef(0);
+
+  // frameloop="demand" https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance#on-demand-rendering
+  useEffect(() => invalidate(), [pos]);
 
   const tlPanels = useRef(gsap.timeline({ paused: true }));
   const seat = useRef<Seat>(null); // `null` mean the seat is available
 
   const inertiaValueRef = useRef(0);
   const twInertia = useRef<gsap.core.Tween>();
-  const tracker = useRef(
-    VelocityTracker.track(posRef, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
+
+  const inertiaTrackedPosRef = useRef(0);
+  useEffect(() => void (inertiaTrackedPosRef.current = pos), [pos]); // copy of pos into a ref for the need of the tracker
+  const trackerRef = useRef(
+    VelocityTracker.track(inertiaTrackedPosRef, "current")[0] // https://gsap.com/docs/v3/Plugins/InertiaPlugin/VelocityTracker/
   );
 
   const damp = useCallback<Api["damp"]>(
     (end = gsap.utils.snap(1)) => {
       twInertia.current?.kill(); // cancel previous inertia tween if still active
 
-      const refPropName = "current";
       // https://gsap.com/docs/v3/Plugins/InertiaPlugin/
-      twInertia.current = gsap.fromTo(inertiaValueRef, posRef, {
-        inertia: {
-          [refPropName]: {
-            velocity: tracker.current.get(refPropName),
-            end,
+      twInertia.current = gsap.fromTo(
+        inertiaValueRef,
+        { current: pos }, // from
+        // to
+        {
+          inertia: {
+            current: {
+              velocity: trackerRef.current.get("current"),
+              end,
+            },
+            duration: { min: opts.duration[0], max: opts.duration[1] },
           },
-          duration: { min: opts.duration[0], max: opts.duration[1] },
-        },
-        onUpdate() {
-          // console.log("tick");
+          onUpdate() {
+            // console.log("tick", inertiaValueRef.current);
 
-          posRef.current = inertiaValueRef.current;
-          invalidate();
-        },
-        onComplete() {
-          posTargetRef.current = inertiaValueRef.current;
-        },
-      });
+            setPos(inertiaValueRef.current);
+          },
+          onComplete() {
+            posTargetRef.current = inertiaValueRef.current;
+          },
+        }
+      );
     },
-    [opts.duration]
+    [opts.duration, pos]
   );
 
   const go = useCallback<Api["go"]>(
@@ -302,8 +314,7 @@ export const CovrflowProvider = forwardRef<
       if (damping) {
         damp(() => gsap.utils.snap(1)(newPosTarget));
       } else {
-        posRef.current = newPosTarget;
-        invalidate();
+        setPos(newPosTarget);
       }
     },
     [damp]
@@ -312,7 +323,7 @@ export const CovrflowProvider = forwardRef<
   // api
   const value = useMemo(
     () => ({
-      posRef,
+      posState: [pos, setPos],
       posTargetRef,
 
       tlPanels,
@@ -320,23 +331,17 @@ export const CovrflowProvider = forwardRef<
 
       inertiaValueRef,
       twInertia,
-      tracker,
+      trackerRef,
 
       go,
       damp,
 
       options: opts,
     }),
-    [go, damp, opts]
-  );
+    [pos, go, damp, opts]
+  ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
-
-  // sync timeline with pos
-  useFrame(() => {
-    const t = mod(posRef.current); // [0..1]
-    tlPanels.current.seek(t);
-  });
 
   return <Provider value={value}>{children}</Provider>;
 });
@@ -359,7 +364,7 @@ function useDrag({
   const {
     inertiaValueRef,
     twInertia,
-    posRef,
+    posState: [, setPos],
     posTargetRef,
     seat,
     damp,
@@ -389,8 +394,7 @@ function useDrag({
       onDrag?.(...args); // callback
 
       posTargetRef.current = inertiaValueRef.current + mx * options.sensitivity; // Set new target value
-      posRef.current = posTargetRef.current; // Immediately update `pos` to the target
-      invalidate();
+      setPos(posTargetRef.current); // Immediately update `pos` to the target
     },
     onDragEnd({ movement: [mx], event }) {
       // console.log("onDragEnd");
@@ -415,13 +419,23 @@ function useDrag({
 // ██      ██   ██ ██   ████ ███████ ███████ ███████
 
 function Panels() {
-  console.log("Panels");
+  // console.log("Panels");
+
+  const {
+    tlPanels,
+    posState: [pos],
+    options,
+  } = useCovrflow();
+
+  // sync timeline with pos
+  useEffect(() => {
+    const t = mod(pos); // [0..1]
+    tlPanels.current.seek(t);
+  }, [pos, tlPanels]);
 
   //
   // Tweens
   //
-
-  const { tlPanels, posRef, options } = useCovrflow();
 
   const panel1Ref = useRef<ElementRef<typeof Box>>(null);
   const panel2Ref = useRef<ElementRef<typeof Box>>(null);
@@ -561,7 +575,7 @@ function Panels() {
   useFrame(() => {
     const refs = [panel1Ref, panel2Ref, panel3Ref, panel4Ref];
     refs.forEach((ref, i) => {
-      const color = circular(Math.floor(posRef.current) - i + 2);
+      const color = circular(Math.floor(pos) - i + 2);
       if (color && ref.current) {
         const mat = ref.current.material as THREE.MeshStandardMaterial;
         mat.color.setHex(color);
@@ -614,7 +628,7 @@ const Panel = forwardRef<
     },
     ref
   ) => {
-    console.log("Panel");
+    // console.log("Panel");
 
     const {
       options: { debug },
