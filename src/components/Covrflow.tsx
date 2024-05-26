@@ -786,6 +786,15 @@ const Panel = forwardRef<
       [size, borderRadius]
     );
 
+    const greenMat = (
+      <meshStandardMaterial
+        transparent
+        opacity={1}
+        color="green"
+        shadowSide={THREE.DoubleSide}
+      />
+    );
+
     return (
       <>
         {!debugOnly && (
@@ -862,7 +871,7 @@ const Panel = forwardRef<
             <primitive object={roundedPlaneGeometry} />
             {children ||
               (src ? (
-                <Suspense>
+                <Suspense fallback={greenMat}>
                   <VideoMaterial
                     src={src}
                     shadowSide={THREE.DoubleSide}
@@ -873,12 +882,7 @@ const Panel = forwardRef<
                   />
                 </Suspense>
               ) : (
-                <meshStandardMaterial
-                  transparent
-                  opacity={1}
-                  color="green"
-                  shadowSide={THREE.DoubleSide}
-                />
+                greenMat
               ))}
           </mesh>
           // </Interactive>
