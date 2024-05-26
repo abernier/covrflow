@@ -456,22 +456,52 @@ function useDrag({
 function VideoMaterial({
   src,
   setVideo,
+  meshAspect,
+  objectFit = "cover",
   ...props
 }: {
   src: string;
   setVideo?: Dispatch<SetStateAction<HTMLVideoElement | undefined>>;
+  meshAspect?: number;
+  objectFit?: "cover" | "contain";
 } & ComponentProps<"meshStandardMaterial">) {
-  const texture = useVideoTexture(src, {
-    // start: false
-  });
-  // texture.wrapS = THREE.RepeatWrapping;
-  // texture.wrapT = THREE.RepeatWrapping;
-  // texture.repeat.x = -1;
-  // texture.offset.x = 1;
+  const tex = useVideoTexture(src);
 
-  // setVideo?.(texture.image);
+  // Mettez à jour la matrice UV de la texture lorsque la vidéo est chargée
+  useEffect(() => {
+    if (tex.image && meshAspect) {
+      const r = tex.image.videoWidth / tex.image.videoHeight;
+      const R = meshAspect;
 
-  return <meshStandardMaterial map={texture} {...props} />;
+      if (objectFit === "cover") {
+        if (r > R) {
+          tex.repeat.x = R / r; // Scale the texture width to cover the container's width
+          tex.repeat.y = 1; // Keep the texture height at 100%
+
+          tex.offset.y = 0; // No vertical offset needed
+        } else {
+          tex.repeat.x = 1; // Keep the texture width at 100%
+          tex.repeat.y = r / R; // Scale the texture height to cover the container's height
+          tex.offset.x = 0; // No horizontal offset needed
+          tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
+        }
+      } else {
+        if (r > R) {
+          tex.repeat.x = 1; // Keep the texture width at 100%
+          tex.repeat.y = r / R; // Scale the texture height to fit within the container's height
+          tex.offset.x = 0; // No horizontal offset needed
+          tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
+        } else {
+          tex.repeat.x = R / r; // Scale the texture width to fit within the container's width
+          tex.repeat.y = 1; // Keep the texture height at 100%
+          tex.offset.x = (1 - tex.repeat.x) / 2; // Center the texture horizontally
+          tex.offset.y = 0; // No vertical offset needed
+        }
+      }
+    }
+  }, [meshAspect, objectFit, tex]);
+
+  return <meshStandardMaterial map={tex} {...props} />;
 }
 
 function Panels() {
@@ -838,15 +868,17 @@ const Panel = forwardRef<
                     // setVideo={setVideo}
                     shadowSide={THREE.DoubleSide}
                     // toneMapped={false}
+                    meshAspect={size[0] / size[1]}
+                    objectFit="cover"
                   />
                 </Suspense>
               ) : (
-              <meshStandardMaterial
-                transparent
-                opacity={1}
+                <meshStandardMaterial
+                  transparent
+                  opacity={1}
                   color="green"
-                shadowSide={THREE.DoubleSide}
-              />
+                  shadowSide={THREE.DoubleSide}
+                />
               ))}
           </mesh>
           // </Interactive>
