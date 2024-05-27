@@ -849,7 +849,15 @@ function Screen({
     }
   }, [aspect, objectFit, tex, video]);
 
-  return <meshStandardMaterial ref={setMaterial} map={tex} {...props} />;
+  return (
+    <meshStandardMaterial
+      ref={setMaterial}
+      map={tex}
+      {...props}
+      side={THREE.DoubleSide}
+      //
+    />
+  );
 }
 
 // ███████ ███████ ███████ ██   ██ ███████ ██████
