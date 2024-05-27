@@ -126,16 +126,12 @@ const createRequiredContext = <T,>() => {
   return [useCtx, Ctx.Provider] as const;
 };
 
-function textureSize(
-  r: number,
-  R: number,
-  objectFit: "cover" | "contain" = "cover"
-) {
+function objectFit(r: number, R: number, size: "cover" | "contain" = "cover") {
   // https://stackoverflow.com/a/78535892/133327
 
   const { repeat, offset } = new THREE.Texture();
 
-  if (objectFit === "cover") {
+  if (size === "cover") {
     if (r > R) {
       repeat.x = R / r;
       repeat.y = 1;
@@ -483,20 +479,17 @@ function Panels() {
   // sync timeline with pos
   useEffect(() => {
     const t = mod(pos); // [0..1]
-    tlPanels.current.seek(t);
+    tlPanels.current.seek(t, false); // 2nd param: `suppressEvents` to false to trigger `on*` callbacks (see: https://gsap.com/docs/v3/GSAP/Tween/seek()/)
   }, [pos, tlPanels]);
 
   //
   // Tweens
   //
 
-  const panel1Ref = useRef<ElementRef<typeof Box>>(null);
-  const panel2Ref = useRef<ElementRef<typeof Box>>(null);
-  const panel3Ref = useRef<ElementRef<typeof Box>>(null);
-  const panel4Ref = useRef<ElementRef<typeof Box>>(null);
-
-  const [material1, setMaterial1] = useState<THREE.Material | null>(null);
-  const [material4, setMaterial4] = useState<THREE.Material | null>(null);
+  const panel1Ref = useRef<ElementRef<"mesh">>(null);
+  const panel2Ref = useRef<ElementRef<"mesh">>(null);
+  const panel3Ref = useRef<ElementRef<"mesh">>(null);
+  const panel4Ref = useRef<ElementRef<"mesh">>(null);
 
   const { contextSafe } = useGSAP(() => {
     console.log("useGSAP");
@@ -505,9 +498,7 @@ function Panels() {
       !panel1Ref.current ||
       !panel2Ref.current ||
       !panel3Ref.current ||
-      !panel4Ref.current ||
-      !material1 ||
-      !material4
+      !panel4Ref.current
     )
       return;
 
@@ -525,21 +516,24 @@ function Panels() {
       arr2vec(STATES.backleft.position),
       { ...arr2vec(STATES.left.position), duration, ease }
     );
+
     const tw1Rot = gsap.fromTo(
       panel1Ref.current.rotation,
       arr2vec(STATES.backleft.rotation),
       { ...arr2vec(STATES.left.rotation), duration, ease }
     );
-    const tw1Transparency = gsap.fromTo(
-      material1,
-      { opacity: STATES.backleft.opacity, transparent: true },
-      {
-        opacity: STATES.left.opacity,
-        transparent: true,
-        duration,
-        // ease: "circ.in",
-      }
-    );
+
+    const o1 = { opacity: STATES.backleft.opacity };
+    const tw1Transparency = gsap.fromTo(o1, o1, {
+      opacity: STATES.left.opacity,
+      duration,
+      // ease: "circ.in",
+      onUpdate() {
+        // console.log("onUpdate", o1);
+        const mat = panel1Ref.current?.material as THREE.MeshStandardMaterial;
+        mat.opacity = o1.opacity;
+      },
+    });
 
     tl1.add(tw1Rot, 0);
     tl1.add(tw1Pos, 0);
@@ -556,6 +550,7 @@ function Panels() {
       arr2vec(STATES.left.position),
       { ...arr2vec(STATES.front.position), duration, ease }
     );
+
     const tw2Rot = gsap.fromTo(
       panel2Ref.current.rotation,
       arr2vec(STATES.left.rotation),
@@ -576,6 +571,7 @@ function Panels() {
       arr2vec(STATES.front.position),
       { ...arr2vec(STATES.right.position), duration, ease }
     );
+
     const tw3Rot = gsap.fromTo(
       panel3Ref.current.rotation,
       arr2vec(STATES.front.rotation),
@@ -596,21 +592,24 @@ function Panels() {
       arr2vec(STATES.right.position),
       { ...arr2vec(STATES.backright.position), duration, ease }
     );
+
     const tw4Rot = gsap.fromTo(
       panel4Ref.current.rotation,
       arr2vec(STATES.right.rotation),
       { ...arr2vec(STATES.backright.rotation), duration, ease }
     );
-    const tw4Transparency = gsap.fromTo(
-      material4,
-      { opacity: STATES.right.opacity, transparent: true },
-      {
-        opacity: STATES.backright.opacity,
-        transparent: true,
-        duration,
-        // ease: "circ.in",
-      }
-    );
+
+    const o4 = { opacity: STATES.right.opacity };
+    const tw4Transparency = gsap.fromTo(o4, o4, {
+      opacity: STATES.backright.opacity,
+      duration,
+      // ease: "circ.in",
+      onUpdate() {
+        // console.log("onUpdate", o4);
+        const mat = panel4Ref.current?.material as THREE.MeshStandardMaterial;
+        mat.opacity = o4.opacity;
+      },
+    });
 
     tl4.add(tw4Rot, 0);
     tl4.add(tw4Pos, 0);
@@ -625,7 +624,7 @@ function Panels() {
     tlPanels.current.add(tl2, 0);
     tlPanels.current.add(tl3, 0);
     tlPanels.current.add(tl4, 0);
-  }, [material1, material4]);
+  });
 
   //
   // Materials
@@ -654,10 +653,10 @@ function Panels() {
       ];
     }
     const srcs = four(films);
-    console.log("srcs", srcs);
+    // console.log("srcs", srcs);
 
     const colors = four(kulers);
-    console.log("colors", colors);
+    // console.log("colors", colors);
 
     return { srcs, colors };
   }, [posFloored]);
@@ -687,8 +686,9 @@ function Panels() {
             <Screen
               color={colors[0]}
               src={srcs[0]}
-              setMaterial={setMaterial1}
               aspect={aspect}
+              transparent
+              opacity={STATES.backleft.opacity}
             />
           </Suspense>
         </Panel>
@@ -698,7 +698,7 @@ function Panels() {
               color={colors[1]}
               src={srcs[1]}
               aspect={aspect}
-              videoTextureProps={{ start: centralVideo === "left" }}
+              // videoTextureProps={{ start: centralVideo === "left" }}
             />
           </Suspense>
         </Panel>
@@ -708,7 +708,7 @@ function Panels() {
               color={colors[2]}
               src={srcs[2]}
               aspect={aspect}
-              videoTextureProps={{ start: centralVideo === "front" }}
+              // videoTextureProps={{ start: centralVideo === "front" }}
             />
           </Suspense>
         </Panel>
@@ -717,8 +717,9 @@ function Panels() {
             <Screen
               color={colors[3]}
               src={srcs[3]}
-              setMaterial={setMaterial4}
               aspect={aspect}
+              transparent
+              opacity={STATES.right.opacity}
             />
           </Suspense>
         </Panel>
@@ -737,9 +738,55 @@ function Panels() {
 // ██      ██   ██ ██  ██ ██ ██      ██
 // ██      ██   ██ ██   ████ ███████ ███████
 
+function roundedRectangleGeometry(
+  w: number,
+  h: number,
+  r: number,
+  s: number = 1
+) {
+  // width, height, radiusCorner, smoothness
+
+  const pi2 = Math.PI * 2;
+  const n = (s + 1) * 4; // number of segments
+  let indices = [];
+  let positions = [];
+  let uvs = [];
+  let qu, sgx, sgy, x, y;
+
+  for (let j = 1; j < n + 1; j++) indices.push(0, j, j + 1); // 0 is center
+  indices.push(0, n, 1);
+  positions.push(0, 0, 0); // rectangle center
+  uvs.push(0.5, 0.5);
+  for (let j = 0; j < n; j++) contour(j);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(positions), 3)
+  );
+  geometry.setAttribute(
+    "uv",
+    new THREE.BufferAttribute(new Float32Array(uvs), 2)
+  );
+
+  return geometry;
+
+  function contour(j: number) {
+    qu = Math.trunc((4 * j) / n) + 1; // quadrant  qu: 1..4
+    sgx = qu === 1 || qu === 4 ? 1 : -1; // signum left/right
+    sgy = qu < 3 ? 1 : -1; // signum  top / bottom
+    x = sgx * (w / 2 - r) + r * Math.cos((pi2 * (j - qu + 1)) / (n - 4)); // corner center + circle
+    y = sgy * (h / 2 - r) + r * Math.sin((pi2 * (j - qu + 1)) / (n - 4));
+
+    positions.push(x, y, 0);
+    uvs.push(0.5 + x / w, 0.5 + y / h);
+  }
+}
+
 const Panel = forwardRef<
-  ElementRef<typeof Box>,
-  ComponentProps<typeof Box> & {
+  ElementRef<"mesh">,
+  ComponentProps<"mesh"> & {
     state: keyof typeof STATES;
     debug?: boolean;
     debugOnly?: boolean;
@@ -771,10 +818,14 @@ const Panel = forwardRef<
 
     const { bind } = useDrag();
 
-    const roundedPlaneGeometry = useMemo(
-      () =>
-        new geometry.RoundedPlaneGeometry(...size.slice(0, 2), borderRadius),
-      [size, borderRadius]
+    // const roundedPlaneGeometry = useMemo(
+    //   () =>
+    //     new geometry.RoundedPlaneGeometry(...size.slice(0, 2), borderRadius),
+    //   [size, borderRadius]
+    // );
+    const planeGeometry = useMemo(
+      () => new THREE.PlaneGeometry(...size.slice(0, 2)),
+      [size]
     );
 
     return (
@@ -788,13 +839,14 @@ const Panel = forwardRef<
             {...props}
             {...(bind() as any)}
           >
-            <primitive object={roundedPlaneGeometry} />
+            {/* <primitive object={roundedPlaneGeometry} /> */}
+            <primitive object={planeGeometry} />
             {children}
           </mesh>
         )}
 
         {debug && (
-          <Box args={size} {...posRot} {...props}>
+          <Box args={size} {...posRot}>
             <meshStandardMaterial wireframe color="#aaa" />
           </Box>
         )}
@@ -811,18 +863,16 @@ const Panel = forwardRef<
 
 function Screen({
   src,
-  setMaterial,
   color = "#bebebe",
   aspect,
-  objectFit = "cover",
-  videoTextureProps: { start, preload, ...videoTextureProps } = {},
+  size = "cover",
+  videoTextureProps: { start = false, preload, ...videoTextureProps } = {},
   ...props
 }: {
   src: string;
-  setMaterial?: Dispatch<SetStateAction<THREE.Material | null>>;
   color?: ComponentProps<"meshStandardMaterial">["color"];
   aspect?: number;
-  objectFit?: "cover" | "contain";
+  size?: "cover" | "contain";
   videoTextureProps?: Parameters<typeof useVideoTexture>[1];
 } & ComponentProps<"meshStandardMaterial">) {
   const tex = useVideoTexture(src, {
@@ -859,18 +909,17 @@ function Screen({
       const r = video.videoWidth / video.videoHeight;
       const R = aspect;
 
-      const { repeat, offset } = textureSize(r, R, objectFit);
+      const { repeat, offset } = objectFit(r, R, size);
       tex.repeat.copy(repeat);
       tex.offset.copy(offset);
     }
-  }, [aspect, objectFit, tex, video]);
+  }, [aspect, size, tex, video]);
 
   let map;
   map = tex;
 
   return (
     <meshStandardMaterial
-      ref={setMaterial}
       color={map ? undefined : color}
       map={map}
       {...props}
