@@ -488,7 +488,9 @@ function Panels() {
       !panel1Ref.current ||
       !panel2Ref.current ||
       !panel3Ref.current ||
-      !panel4Ref.current
+      !panel4Ref.current ||
+      !material1 ||
+      !material4
     )
       return;
 
@@ -642,7 +644,7 @@ function Panels() {
     [pos]
   );
 
-  const greenMat = (
+  const greenScreen = (
     <meshStandardMaterial
       transparent
       opacity={1}
@@ -657,22 +659,30 @@ function Panels() {
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
         <Panel ref={panel1Ref} state="backleft" size={size}>
-          <Suspense fallback={greenMat}>
+          <Suspense fallback={greenScreen}>
             <Screen src={srcs[0]} setMaterial={setMaterial1} aspect={aspect} />
           </Suspense>
         </Panel>
         <Panel ref={panel2Ref} state="left" size={size}>
-          <Suspense fallback={greenMat}>
-            <Screen src={srcs[1]} aspect={aspect} />
+          <Suspense fallback={greenScreen}>
+            <Screen
+              src={srcs[1]}
+              aspect={aspect}
+              videoTextureProps={{ start: centralVideo === "left" }}
+            />
           </Suspense>
         </Panel>
         <Panel ref={panel3Ref} state="front" size={size}>
-          <Suspense fallback={greenMat}>
-            <Screen src={srcs[2]} aspect={aspect} />
+          <Suspense fallback={greenScreen}>
+            <Screen
+              src={srcs[2]}
+              aspect={aspect}
+              videoTextureProps={{ start: centralVideo === "front" }}
+            />
           </Suspense>
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>
-          <Suspense fallback={greenMat}>
+          <Suspense fallback={greenScreen}>
             <Screen src={srcs[3]} setMaterial={setMaterial4} aspect={aspect} />
           </Suspense>
         </Panel>
