@@ -41,10 +41,6 @@ const useGesture = createUseGesture([dragAction, pinchAction]);
 // Utilities
 //
 
-function circular(i: number) {
-  return circ(content, i);
-}
-
 //
 // circ
 //
@@ -168,7 +164,7 @@ function textureSize(
 // Constants
 //
 
-const content = [
+const kulers = [
   0xecfdf5, 0xd1fae5, 0xa7f3d0, 0x6ee7b7, 0x34d399, 0x10b981, 0x059669,
   0x047857, 0x065f46, 0x064e3b, 0x022c22,
 ].reverse();
@@ -648,16 +644,22 @@ function Panels() {
   // }, [pos]);
 
   const posFloored = Math.floor(pos);
-  const srcs = useMemo(() => {
-    const ret = [
-      circ(films, posFloored + 2), // backleft
-      circ(films, posFloored + 1), // left
-      circ(films, posFloored + 0), // front
-      circ(films, posFloored - 1), // right
-    ];
-    console.log("srcs", ret);
+  const { srcs, colors } = useMemo(() => {
+    function four<T>(arr: T[]) {
+      return [
+        circ(arr, posFloored + 2), // backleft
+        circ(arr, posFloored + 1), // left
+        circ(arr, posFloored + 0), // front
+        circ(arr, posFloored - 1), // right
+      ];
+    }
+    const srcs = four(films);
+    console.log("srcs", srcs);
 
-    return ret;
+    const colors = four(kulers);
+    console.log("colors", colors);
+
+    return { srcs, colors };
   }, [posFloored]);
 
   // Determine the most "central" video
@@ -682,12 +684,18 @@ function Panels() {
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
         <Panel ref={panel1Ref} state="backleft" size={size}>
           <Suspense fallback={greenScreen}>
-            <Screen src={srcs[0]} setMaterial={setMaterial1} aspect={aspect} />
+            <Screen
+              color={colors[0]}
+              src={srcs[0]}
+              setMaterial={setMaterial1}
+              aspect={aspect}
+            />
           </Suspense>
         </Panel>
         <Panel ref={panel2Ref} state="left" size={size}>
           <Suspense fallback={greenScreen}>
             <Screen
+              color={colors[1]}
               src={srcs[1]}
               aspect={aspect}
               videoTextureProps={{ start: centralVideo === "left" }}
@@ -697,6 +705,7 @@ function Panels() {
         <Panel ref={panel3Ref} state="front" size={size}>
           <Suspense fallback={greenScreen}>
             <Screen
+              color={colors[2]}
               src={srcs[2]}
               aspect={aspect}
               videoTextureProps={{ start: centralVideo === "front" }}
@@ -705,7 +714,12 @@ function Panels() {
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>
           <Suspense fallback={greenScreen}>
-            <Screen src={srcs[3]} setMaterial={setMaterial4} aspect={aspect} />
+            <Screen
+              color={colors[3]}
+              src={srcs[3]}
+              setMaterial={setMaterial4}
+              aspect={aspect}
+            />
           </Suspense>
         </Panel>
 
@@ -798,6 +812,7 @@ const Panel = forwardRef<
 function Screen({
   src,
   setMaterial,
+  color = "#bebebe",
   aspect,
   objectFit = "cover",
   videoTextureProps: { start, preload, ...videoTextureProps } = {},
@@ -805,6 +820,7 @@ function Screen({
 }: {
   src: string;
   setMaterial?: Dispatch<SetStateAction<THREE.Material | null>>;
+  color?: ComponentProps<"meshStandardMaterial">["color"];
   aspect?: number;
   objectFit?: "cover" | "contain";
   videoTextureProps?: Parameters<typeof useVideoTexture>[1];
@@ -849,10 +865,14 @@ function Screen({
     }
   }, [aspect, objectFit, tex, video]);
 
+  let map;
+  map = tex;
+
   return (
     <meshStandardMaterial
       ref={setMaterial}
-      map={tex}
+      color={map ? undefined : color}
+      map={map}
       {...props}
       side={THREE.DoubleSide}
       //
