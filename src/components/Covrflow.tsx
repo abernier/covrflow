@@ -276,7 +276,6 @@ type Seat = THREE.Mesh | null;
 type Api = {
   posState: [Pos, Dispatch<SetStateAction<Pos>>];
   posTargetRef: PosRef;
-  posFloored: number;
 
   tlPanels: MutableRefObject<gsap.core.Timeline>;
   seat: MutableRefObject<Seat>;
@@ -379,22 +378,11 @@ export const CovrflowProvider = forwardRef<
     [damp]
   );
 
-  const [posFloored, setPosFloored] = useState(Math.floor(pos));
-  useEffect(() => {
-    // posFloored
-    const _pos = Math.floor(pos);
-    if (posFloored !== _pos) {
-      console.log("pos has changed from %s to %s", posFloored, _pos);
-      setPosFloored(_pos);
-    }
-  }, [pos, posFloored]);
-
   // api
   const value = useMemo(
     () => ({
       posState: [pos, setPos],
       posTargetRef,
-      posFloored,
 
       tlPanels,
       seat,
@@ -408,7 +396,7 @@ export const CovrflowProvider = forwardRef<
 
       options: opts,
     }),
-    [pos, posFloored, go, damp, opts]
+    [pos, go, damp, opts]
   ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
@@ -495,7 +483,6 @@ function Panels() {
     tlPanels,
     posState: [pos],
     options,
-    posFloored,
   } = useCovrflow();
 
   // sync timeline with pos
@@ -661,6 +648,7 @@ function Panels() {
   //   });
   // }, [pos]);
 
+  const posFloored = Math.floor(pos);
   const srcs = useMemo(() => {
     const ret = [
       circ(films, posFloored + 2), // backleft
@@ -683,7 +671,7 @@ function Panels() {
     <meshStandardMaterial
       transparent
       opacity={1}
-      color="green"
+      color="#2ac402"
       shadowSide={THREE.DoubleSide}
     />
   );
