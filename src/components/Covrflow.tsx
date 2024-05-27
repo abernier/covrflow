@@ -135,6 +135,8 @@ function textureSize(
   R: number,
   objectFit: "cover" | "contain" = "cover"
 ) {
+  // https://stackoverflow.com/a/78535892/133327
+
   const repeat = new THREE.Vector2(1, 1);
   const offset = new THREE.Vector2(0, 0);
 
