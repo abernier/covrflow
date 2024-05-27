@@ -130,6 +130,39 @@ const createRequiredContext = <T,>() => {
   return [useCtx, Ctx.Provider] as const;
 };
 
+function textureSize(
+  r: number,
+  R: number,
+  objectFit: "cover" | "contain" = "cover"
+) {
+  const repeat = new THREE.Vector2(1, 1);
+  const offset = new THREE.Vector2(0, 0);
+
+  if (objectFit === "cover") {
+    if (r > R) {
+      repeat.x = R / r;
+      repeat.y = 1;
+    } else {
+      repeat.x = 1;
+      repeat.y = r / R;
+    }
+  } else {
+    if (r > R) {
+      repeat.x = 1;
+      repeat.y = r / R;
+    } else {
+      repeat.x = R / r;
+      repeat.y = 1;
+    }
+  }
+
+  // center
+  offset.y = (1 - repeat.y) / 2;
+  offset.x = (1 - repeat.x) / 2;
+
+  return { repeat, offset };
+}
+
 //
 // Constants
 //
@@ -816,33 +849,14 @@ function Screen({
     }
   }, [start, video]);
 
-  // Mettez à jour la matrice UV de la texture lorsque la vidéo est chargée
   useEffect(() => {
     if (video && aspect) {
       const r = video.videoWidth / video.videoHeight;
       const R = aspect;
 
-      // Cover/contain texture https://stackoverflow.com/a/78535892/133327
-      if (objectFit === "cover") {
-        if (r > R) {
-          tex.repeat.x = R / r; // Scale the texture width to cover the container's width
-          tex.repeat.y = 1; // Keep the texture height at 100%
-        } else {
-          tex.repeat.x = 1; // Keep the texture width at 100%
-          tex.repeat.y = r / R; // Scale the texture height to cover the container's height
-        }
-      } else {
-        if (r > R) {
-          tex.repeat.x = 1; // Keep the texture width at 100%
-          tex.repeat.y = r / R; // Scale the texture height to fit within the container's height
-        } else {
-          tex.repeat.x = R / r; // Scale the texture width to fit within the container's width
-          tex.repeat.y = 1; // Keep the texture height at 100%
-        }
-      }
-
-      tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
-      tex.offset.x = (1 - tex.repeat.x) / 2; // Center the texture horizontally
+      const { repeat, offset } = textureSize(r, R, objectFit);
+      tex.repeat.copy(repeat);
+      tex.offset.copy(offset);
     }
   }, [aspect, objectFit, tex, video]);
 
