@@ -478,10 +478,8 @@ function Panels() {
   const panel3Ref = useRef<ElementRef<typeof Box>>(null);
   const panel4Ref = useRef<ElementRef<typeof Box>>(null);
 
-  const [videoPanel1, setVideoPanel1] = useState<HTMLVideoElement | null>(null);
-  const [videoPanel2, setVideoPanel2] = useState<HTMLVideoElement | null>(null);
-  const [videoPanel3, setVideoPanel3] = useState<HTMLVideoElement | null>(null);
-  const [videoPanel4, setVideoPanel4] = useState<HTMLVideoElement | null>(null);
+  const [material1, setMaterial1] = useState<THREE.Material | null>(null);
+  const [material4, setMaterial4] = useState<THREE.Material | null>(null);
 
   const { contextSafe } = useGSAP(() => {
     console.log("useGSAP");
@@ -514,7 +512,7 @@ function Panels() {
       { ...arr2vec(STATES.left.rotation), duration, ease }
     );
     const tw1Transparency = gsap.fromTo(
-      panel1Ref.current.material,
+      material1,
       { opacity: STATES.backleft.opacity, transparent: true },
       {
         opacity: STATES.left.opacity,
@@ -585,7 +583,7 @@ function Panels() {
       { ...arr2vec(STATES.backright.rotation), duration, ease }
     );
     const tw4Transparency = gsap.fromTo(
-      panel4Ref.current.material,
+      material4,
       { opacity: STATES.right.opacity, transparent: true },
       {
         opacity: STATES.backright.opacity,
@@ -608,7 +606,7 @@ function Panels() {
     tlPanels.current.add(tl2, 0);
     tlPanels.current.add(tl3, 0);
     tlPanels.current.add(tl4, 0);
-  }, [videoPanel1, videoPanel2, videoPanel3, videoPanel4]);
+  }, [material1, material4]);
 
   //
   // Materials
@@ -644,41 +642,40 @@ function Panels() {
     [pos]
   );
 
+  const greenMat = (
+    <meshStandardMaterial
+      transparent
+      opacity={1}
+      color="green"
+      shadowSide={THREE.DoubleSide}
+    />
+  );
+
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
-        <Panel
-          ref={panel1Ref}
-          state="backleft"
-          size={size}
-          src={srcs[0]}
-          setVideo={setVideoPanel1}
-        />
-        <Panel
-          ref={panel2Ref}
-          state="left"
-          size={size}
-          src={srcs[1]}
-          startVideo={centralVideo === "left"}
-          setVideo={setVideoPanel2}
-        />
-        <Panel
-          ref={panel3Ref}
-          state="front"
-          size={size}
-          src={srcs[2]}
-          startVideo={centralVideo === "front"}
-          setVideo={setVideoPanel3}
-        />
-        <Panel
-          ref={panel4Ref}
-          state="right"
-          size={size}
-          src={srcs[3]}
-          setVideo={setVideoPanel4}
-        />
+        <Panel ref={panel1Ref} state="backleft" size={size}>
+          <Suspense fallback={greenMat}>
+            <Screen src={srcs[0]} setMaterial={setMaterial1} aspect={aspect} />
+          </Suspense>
+        </Panel>
+        <Panel ref={panel2Ref} state="left" size={size}>
+          <Suspense fallback={greenMat}>
+            <Screen src={srcs[1]} aspect={aspect} />
+          </Suspense>
+        </Panel>
+        <Panel ref={panel3Ref} state="front" size={size}>
+          <Suspense fallback={greenMat}>
+            <Screen src={srcs[2]} aspect={aspect} />
+          </Suspense>
+        </Panel>
+        <Panel ref={panel4Ref} state="right" size={size}>
+          <Suspense fallback={greenMat}>
+            <Screen src={srcs[3]} setMaterial={setMaterial4} aspect={aspect} />
+          </Suspense>
+        </Panel>
 
         <Panel state="backright" debugOnly size={size} />
       </group>
@@ -700,11 +697,8 @@ const Panel = forwardRef<
     state: keyof typeof STATES;
     debug?: boolean;
     debugOnly?: boolean;
-    size?: [number, number, number];
+    size: [number, number, number];
     borderRadius?: number;
-    src?: string;
-    startVideo?: boolean;
-    setVideo?: Dispatch<SetStateAction<HTMLVideoElement | null>>;
   }
 >(
   (
@@ -714,9 +708,6 @@ const Panel = forwardRef<
       debugOnly = false,
       size = [3, 5, 0.1],
       borderRadius = 0.15,
-      src,
-      startVideo = false,
-      setVideo,
       ...props
     },
     ref
@@ -734,91 +725,15 @@ const Panel = forwardRef<
 
     const { bind } = useDrag();
 
-    // const [_pointer] = useState(new Vector2());
-    // const [_event] = useState({ type: "", data: _pointer });
-
-    // const dragging = useRef(false);
-
     const roundedPlaneGeometry = useMemo(
       () =>
         new geometry.RoundedPlaneGeometry(...size.slice(0, 2), borderRadius),
       [size, borderRadius]
     );
 
-    const greenMat = (
-      <meshStandardMaterial
-        transparent
-        opacity={1}
-        color="green"
-        shadowSide={THREE.DoubleSide}
-      />
-    );
-
     return (
       <>
         {!debugOnly && (
-          // <Interactive
-          //   onSelectStart={(e) => {
-          //     console.log("onSelectStart", e);
-
-          //     dragging.current = true;
-
-          //     if (!e.intersection?.uv) return;
-
-          //     const uv = e.intersection?.uv;
-          //     const object = e.intersection?.object;
-
-          //     _event.type = "mousedown";
-          //     _event.data.set(uv.x, 1 - uv.y);
-
-          //     const clientX = uv.x * window.innerWidth;
-          //     const clientY = uv.y * window.innerHeight;
-
-          //     object.dispatchEvent(
-          //       new PointerEvent("pointerdown", { clientX, clientY })
-          //     );
-          //   }}
-          //   onSelectEnd={(e) => {
-          //     console.log("onSelectEnd", e);
-
-          //     dragging.current = false;
-
-          //     if (!e.intersection?.uv) return;
-
-          //     const uv = e.intersection?.uv;
-          //     const object = e.intersection?.object;
-
-          //     // _event.type = "mouseup";
-          //     // _event.data.set(uv.x, 1 - uv.y);
-          //     // object.dispatchEvent(_event);
-
-          //     const clientX = uv.x * window.innerWidth;
-          //     const clientY = uv.y * window.innerHeight;
-          //     object.dispatchEvent(
-          //       new PointerEvent("pointerup", { clientX, clientY })
-          //     );
-          //   }}
-          //   onMove={(e) => {
-          //     if (dragging.current !== true) return; // skip if not dragging
-          //     console.log("onMove", e);
-
-          //     if (!e.intersection?.uv) return;
-
-          //     const uv = e.intersection?.uv;
-          //     const object = e.intersection?.object;
-
-          //     // _event.type = "mousemove";
-          //     // _event.data.set(uv.x, 1 - uv.y);
-          //     // object.dispatchEvent(_event);
-
-          //     const clientX = uv.x * window.innerWidth;
-          //     const clientY = uv.y * window.innerHeight;
-          //     console.log(clientX, clientY);
-          //     object.dispatchEvent(
-          //       new PointerEvent("pointermove", { clientX, clientY })
-          //     );
-          //   }}
-          // >
           <mesh
             ref={ref}
             castShadow
@@ -828,24 +743,8 @@ const Panel = forwardRef<
             {...(bind() as any)}
           >
             <primitive object={roundedPlaneGeometry} />
-            {children ||
-              (src ? (
-                <Suspense fallback={greenMat}>
-                  <VideoMaterial
-                    src={src}
-                    shadowSide={THREE.DoubleSide}
-                    // toneMapped={false}
-                    meshAspect={size[0] / size[1]}
-                    objectFit="cover"
-                    videoTextureProps={{ start: startVideo }}
-                    setVideo={setVideo}
-                  />
-                </Suspense>
-              ) : (
-                greenMat
-              ))}
+            {children}
           </mesh>
-          // </Interactive>
         )}
 
         {debug && (
@@ -858,29 +757,25 @@ const Panel = forwardRef<
   }
 );
 
-// ██    ██ ██ ██████  ███████  ██████  ███    ███  █████  ████████ ███████ ██████  ██  █████  ██
-// ██    ██ ██ ██   ██ ██      ██    ██ ████  ████ ██   ██    ██    ██      ██   ██ ██ ██   ██ ██
-// ██    ██ ██ ██   ██ █████   ██    ██ ██ ████ ██ ███████    ██    █████   ██████  ██ ███████ ██
-//  ██  ██  ██ ██   ██ ██      ██    ██ ██  ██  ██ ██   ██    ██    ██      ██   ██ ██ ██   ██ ██
-//   ████   ██ ██████  ███████  ██████  ██      ██ ██   ██    ██    ███████ ██   ██ ██ ██   ██ ███████
+// ███████  ██████ ██████  ███████ ███████ ███    ██
+// ██      ██      ██   ██ ██      ██      ████   ██
+// ███████ ██      ██████  █████   █████   ██ ██  ██
+//      ██ ██      ██   ██ ██      ██      ██  ██ ██
+// ███████  ██████ ██   ██ ███████ ███████ ██   ████
 
-function VideoMaterial({
+function Screen({
   src,
-  setVideo,
-  meshAspect,
+  setMaterial,
+  aspect,
   objectFit = "cover",
-  videoTextureProps: {
-    start = false,
-    preload = "auto",
-    ...videoTextureProps
-  } = {},
+  videoTextureProps: { start, preload, ...videoTextureProps } = {},
   ...props
 }: {
   src: string;
-  setVideo?: Dispatch<SetStateAction<HTMLVideoElement | null>>;
-  meshAspect?: number;
+  setMaterial?: Dispatch<SetStateAction<THREE.Material | null>>;
+  aspect?: number;
   objectFit?: "cover" | "contain";
-  videoTextureProps: Parameters<typeof useVideoTexture>[1];
+  videoTextureProps?: Parameters<typeof useVideoTexture>[1];
 } & ComponentProps<"meshStandardMaterial">) {
   const tex = useVideoTexture(src, {
     start,
@@ -893,11 +788,11 @@ function VideoMaterial({
       if (!video) return;
 
       video.currentTime = 30;
-
-      setVideo?.(video);
     },
     ...videoTextureProps,
   });
+
+  // setTexture?.(tex);
 
   const video = tex.image as HTMLVideoElement;
 
@@ -913,9 +808,9 @@ function VideoMaterial({
 
   // Mettez à jour la matrice UV de la texture lorsque la vidéo est chargée
   useEffect(() => {
-    if (video && meshAspect) {
+    if (video && aspect) {
       const r = video.videoWidth / video.videoHeight;
-      const R = meshAspect;
+      const R = aspect;
 
       // Cover/contain texture https://stackoverflow.com/a/78535892/133327
       if (objectFit === "cover") {
@@ -939,9 +834,9 @@ function VideoMaterial({
       tex.offset.y = (1 - tex.repeat.y) / 2; // Center the texture vertically
       tex.offset.x = (1 - tex.repeat.x) / 2; // Center the texture horizontally
     }
-  }, [meshAspect, objectFit, tex, video]);
+  }, [aspect, objectFit, tex, video]);
 
-  return <meshStandardMaterial map={tex} {...props} />;
+  return <meshStandardMaterial ref={setMaterial} map={tex} {...props} />;
 }
 
 // ███████ ███████ ███████ ██   ██ ███████ ██████
