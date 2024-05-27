@@ -137,8 +137,7 @@ function textureSize(
 ) {
   // https://stackoverflow.com/a/78535892/133327
 
-  const repeat = new THREE.Vector2(1, 1);
-  const offset = new THREE.Vector2(0, 0);
+  const { repeat, offset } = new THREE.Texture();
 
   if (objectFit === "cover") {
     if (r > R) {
