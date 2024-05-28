@@ -32,6 +32,7 @@ import { Vector2 } from "three";
 import merge from "deepmerge";
 import { invalidate, useFrame } from "@react-three/fiber";
 import * as geometry from "maath/geometry";
+import { suspend } from "suspend-react";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -175,12 +176,22 @@ const films = [
   "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
   "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
   "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
   // "01.mp4",
   // "02.mp4",
   // "03.mp4",
   // "04.mp4",
   // "05.mp4",
 ];
+
+const medias = Array.from({ length: kulers.length }).map((_, i) => ({
+  color: kulers[i],
+  image:
+    "https://fastly.picsum.photos/id/184/700/1600.jpg?hmac=yW9L_wNY_bQdbGrExMiN2xNarw3SKkeIWldhYHieeDs",
+  video: films[i],
+}));
 
 const r = 5;
 const TRANSLUCENCY = 0;
@@ -268,6 +279,8 @@ type Api = {
   posState: [Pos, Dispatch<SetStateAction<Pos>>];
   posTargetRef: PosRef;
 
+  draggingState: [boolean, Dispatch<SetStateAction<boolean>>];
+
   tlPanels: MutableRefObject<gsap.core.Timeline>;
   seat: MutableRefObject<Seat>;
 
@@ -301,6 +314,8 @@ export const CovrflowProvider = forwardRef<
 
   const [pos, setPos] = useState(0);
   const posTargetRef = useRef(0);
+
+  const [dragging, setDragging] = useState(false);
 
   // frameloop="demand" https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance#on-demand-rendering
   useEffect(() => invalidate(), [pos]);
@@ -375,6 +390,8 @@ export const CovrflowProvider = forwardRef<
       posState: [pos, setPos],
       posTargetRef,
 
+      draggingState: [dragging, setDragging],
+
       tlPanels,
       seat,
 
@@ -387,7 +404,7 @@ export const CovrflowProvider = forwardRef<
 
       options: opts,
     }),
-    [pos, go, damp, opts]
+    [pos, dragging, go, damp, opts]
   ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
@@ -415,6 +432,7 @@ function useDrag({
     twInertia,
     posState: [, setPos],
     posTargetRef,
+    draggingState: [, setDragging],
     seat,
     damp,
     options,
@@ -423,6 +441,8 @@ function useDrag({
   const bind = useGesture({
     onDragStart({ event }) {
       // console.log("onDragStart");
+
+      setDragging(true);
 
       // Taking the seat if available
       if (seat.current !== null) return; // if not => skip
@@ -455,6 +475,8 @@ function useDrag({
       // if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
       damp();
+
+      setDragging(false);
     },
   });
 
@@ -473,6 +495,8 @@ function Panels() {
   const {
     tlPanels,
     posState: [pos],
+    draggingState: [dragging],
+    trackerRef,
     options,
   } = useCovrflow();
 
@@ -643,22 +667,13 @@ function Panels() {
   // }, [pos]);
 
   const posFloored = Math.floor(pos);
-  const { srcs, colors } = useMemo(() => {
-    function four<T>(arr: T[]) {
-      return [
-        circ(arr, posFloored + 2), // backleft
-        circ(arr, posFloored + 1), // left
-        circ(arr, posFloored + 0), // front
-        circ(arr, posFloored - 1), // right
-      ];
-    }
-    const srcs = four(films);
-    // console.log("srcs", srcs);
-
-    const colors = four(kulers);
-    // console.log("colors", colors);
-
-    return { srcs, colors };
+  const fourMedias = useMemo(() => {
+    return [
+      circ(medias, posFloored + 2), // backleft
+      circ(medias, posFloored + 1), // left
+      circ(medias, posFloored + 0), // front
+      circ(medias, posFloored - 1), // right
+    ];
   }, [posFloored]);
 
   // Determine the most "central" video
@@ -667,61 +682,40 @@ function Panels() {
     [pos]
   );
 
-  const greenScreen = (
-    <meshStandardMaterial
-      transparent
-      opacity={1}
-      color="#2ac402"
-      shadowSide={THREE.DoubleSide}
-    />
-  );
-
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
         <Panel ref={panel1Ref} state="backleft" size={size}>
-          <Suspense fallback={greenScreen}>
-            <Screen
-              color={colors[0]}
-              src={srcs[0]}
-              aspect={aspect}
-              transparent
-              opacity={STATES.backleft.opacity}
-            />
-          </Suspense>
+          <Screen
+            media={fourMedias[0]}
+            aspect={aspect}
+            transparent
+            opacity={STATES.backleft.opacity}
+          />
         </Panel>
         <Panel ref={panel2Ref} state="left" size={size}>
-          <Suspense fallback={greenScreen}>
-            <Screen
-              color={colors[1]}
-              src={srcs[1]}
-              aspect={aspect}
-              // videoTextureProps={{ start: centralVideo === "left" }}
-            />
-          </Suspense>
+          <Screen
+            media={fourMedias[1]}
+            aspect={aspect}
+            // start={centralVideo === "left"}
+          />
         </Panel>
         <Panel ref={panel3Ref} state="front" size={size}>
-          <Suspense fallback={greenScreen}>
-            <Screen
-              color={colors[2]}
-              src={srcs[2]}
-              aspect={aspect}
-              // videoTextureProps={{ start: centralVideo === "front" }}
-            />
-          </Suspense>
+          <Screen
+            media={fourMedias[2]}
+            aspect={aspect}
+            // start={centralVideo === "front"}
+          />
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>
-          <Suspense fallback={greenScreen}>
-            <Screen
-              color={colors[3]}
-              src={srcs[3]}
-              aspect={aspect}
-              transparent
-              opacity={STATES.right.opacity}
-            />
-          </Suspense>
+          <Screen
+            media={fourMedias[3]}
+            aspect={aspect}
+            transparent
+            opacity={STATES.right.opacity}
+          />
         </Panel>
 
         <Panel state="backright" debugOnly size={size} />
@@ -737,52 +731,6 @@ function Panels() {
 // ██████  ███████ ██ ██  ██ █████   ██
 // ██      ██   ██ ██  ██ ██ ██      ██
 // ██      ██   ██ ██   ████ ███████ ███████
-
-function roundedRectangleGeometry(
-  w: number,
-  h: number,
-  r: number,
-  s: number = 1
-) {
-  // width, height, radiusCorner, smoothness
-
-  const pi2 = Math.PI * 2;
-  const n = (s + 1) * 4; // number of segments
-  let indices = [];
-  let positions = [];
-  let uvs = [];
-  let qu, sgx, sgy, x, y;
-
-  for (let j = 1; j < n + 1; j++) indices.push(0, j, j + 1); // 0 is center
-  indices.push(0, n, 1);
-  positions.push(0, 0, 0); // rectangle center
-  uvs.push(0.5, 0.5);
-  for (let j = 0; j < n; j++) contour(j);
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
-  geometry.setAttribute(
-    "position",
-    new THREE.BufferAttribute(new Float32Array(positions), 3)
-  );
-  geometry.setAttribute(
-    "uv",
-    new THREE.BufferAttribute(new Float32Array(uvs), 2)
-  );
-
-  return geometry;
-
-  function contour(j: number) {
-    qu = Math.trunc((4 * j) / n) + 1; // quadrant  qu: 1..4
-    sgx = qu === 1 || qu === 4 ? 1 : -1; // signum left/right
-    sgy = qu < 3 ? 1 : -1; // signum  top / bottom
-    x = sgx * (w / 2 - r) + r * Math.cos((pi2 * (j - qu + 1)) / (n - 4)); // corner center + circle
-    y = sgy * (h / 2 - r) + r * Math.sin((pi2 * (j - qu + 1)) / (n - 4));
-
-    positions.push(x, y, 0);
-    uvs.push(0.5 + x / w, 0.5 + y / h);
-  }
-}
 
 const Panel = forwardRef<
   ElementRef<"mesh">,
@@ -862,25 +810,118 @@ const Panel = forwardRef<
 // ███████  ██████ ██   ██ ███████ ███████ ██   ████
 
 function Screen({
+  media,
+  aspect,
+  mode = "image",
+  start = false,
+  ...props
+}: {
+  media: (typeof medias)[number];
+  aspect?: number;
+  mode?: "color" | "image" | "video";
+  start?: boolean;
+} & ComponentProps<"meshStandardMaterial">) {
+  // console.log("Screen");
+
+  const commonProps = { side: THREE.DoubleSide, ...props };
+  const imageVideoProps = { aspect };
+
+  const color = <ColorMaterial color={media.color} {...commonProps} />;
+  const image = (
+    <Suspense fallback={color}>
+      <ImageMaterial src={media.image} {...commonProps} {...imageVideoProps} />
+    </Suspense>
+  );
+  const video = (
+    <Suspense fallback={image}>
+      <VideoMaterial
+        src={media.video}
+        {...commonProps}
+        {...imageVideoProps}
+        videoTextureProps={{ start }}
+      />
+    </Suspense>
+  );
+
+  return {
+    color,
+    image,
+    video,
+  }[mode];
+}
+
+function ColorMaterial({
+  color,
+  ...props
+}: ComponentProps<"meshStandardMaterial">) {
+  return <meshStandardMaterial color={color} {...props} />;
+}
+
+const useImageTexture = (src: string) => {
+  const texture = suspend(
+    () =>
+      new Promise((resolve, reject) => {
+        new THREE.TextureLoader().load(src, resolve, undefined, reject);
+      }),
+    [src]
+  ) as THREE.Texture;
+
+  return texture;
+};
+
+function ImageMaterial({
   src,
-  color = "#bebebe",
   aspect,
   size = "cover",
-  videoTextureProps: { start = false, preload, ...videoTextureProps } = {},
   ...props
 }: {
   src: string;
-  color?: ComponentProps<"meshStandardMaterial">["color"];
   aspect?: number;
   size?: "cover" | "contain";
-  videoTextureProps?: Parameters<typeof useVideoTexture>[1];
 } & ComponentProps<"meshStandardMaterial">) {
-  const tex = useVideoTexture(src, {
+  // console.log("ImageMaterial", src);
+
+  const imageTexture = useImageTexture(src);
+
+  const image = imageTexture.image as HTMLImageElement;
+
+  useEffect(() => {
+    if (image && aspect) {
+      const r = image.naturalWidth / image.naturalHeight;
+      const R = aspect;
+
+      const { repeat, offset } = objectFit(r, R, size);
+      imageTexture.repeat.copy(repeat);
+      imageTexture.offset.copy(offset);
+    }
+  }, [aspect, size, image, imageTexture]);
+
+  return <meshStandardMaterial map={imageTexture} {...props} />;
+}
+
+function VideoMaterial({
+  src,
+  videoTextureProps: {
+    start = false,
+    // unsuspend = "canplay",
+    ...videoTextureProps
+  } = {},
+  aspect,
+  size = "cover",
+  ...props
+}: {
+  src: Parameters<typeof useVideoTexture>[0];
+  videoTextureProps?: Parameters<typeof useVideoTexture>[1];
+  aspect?: number;
+  size?: "cover" | "contain";
+} & ComponentProps<"meshStandardMaterial">) {
+  // console.log("VideoMaterial", src);
+
+  const videoTexture = useVideoTexture(src, {
     start,
-    preload,
-    // unsuspend: "canplaythrough",
+    // unsuspend,
     onloadedmetadata(e) {
-      console.log("onloadedmetadata", e);
+      // console.log("onloadedmetadata", e);
 
       const video = e.target as HTMLVideoElement;
       if (!video) return;
@@ -890,11 +931,10 @@ function Screen({
     ...videoTextureProps,
   });
 
-  // setTexture?.(tex);
-
-  const video = tex.image as HTMLVideoElement;
+  const video = videoTexture.image as HTMLVideoElement;
 
   useEffect(() => {
+    // console.log("useEffect1");
     if (video) {
       if (start) {
         video.play();
@@ -905,28 +945,18 @@ function Screen({
   }, [start, video]);
 
   useEffect(() => {
+    // console.log("useEffect2");
     if (video && aspect) {
       const r = video.videoWidth / video.videoHeight;
       const R = aspect;
 
       const { repeat, offset } = objectFit(r, R, size);
-      tex.repeat.copy(repeat);
-      tex.offset.copy(offset);
+      videoTexture.repeat.copy(repeat);
+      videoTexture.offset.copy(offset);
     }
-  }, [aspect, size, tex, video]);
+  }, [aspect, size, videoTexture, video]);
 
-  let map;
-  map = tex;
-
-  return (
-    <meshStandardMaterial
-      color={map ? undefined : color}
-      map={map}
-      {...props}
-      side={THREE.DoubleSide}
-      //
-    />
-  );
+  return <meshStandardMaterial map={videoTexture} {...props} />;
 }
 
 // ███████ ███████ ███████ ██   ██ ███████ ██████
