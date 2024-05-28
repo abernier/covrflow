@@ -16,7 +16,13 @@ import {
   useEffect,
   Suspense,
 } from "react";
-import { Box, useVideoTexture } from "@react-three/drei";
+import {
+  Box,
+  Sphere,
+  Text,
+  // useVideoTexture
+} from "@react-three/drei";
+import { useVideoTexture } from "./tmp/useTexture";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
@@ -32,7 +38,7 @@ import { Vector2 } from "three";
 import merge from "deepmerge";
 import { invalidate, useFrame } from "@react-three/fiber";
 import * as geometry from "maath/geometry";
-import { suspend } from "suspend-react";
+import { suspend, peek } from "suspend-react";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -168,17 +174,20 @@ const kulers = [
 
 // List of films from https://gist.github.com/jsturgis/3b19447b304616f18657
 const films = [
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
   "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
   "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
   "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
   "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
+  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4",
+
   // "01.mp4",
   // "02.mp4",
   // "03.mp4",
@@ -186,12 +195,12 @@ const films = [
   // "05.mp4",
 ];
 
-const medias = Array.from({ length: kulers.length }).map((_, i) => ({
-  color: kulers[i],
-  image:
-    "https://fastly.picsum.photos/id/184/700/1600.jpg?hmac=yW9L_wNY_bQdbGrExMiN2xNarw3SKkeIWldhYHieeDs",
-  video: films[i],
+const medias = Array.from({ length: 20 }).map((_, i) => ({
+  color: kulers[i % kulers.length],
+  image: `https://picsum.photos/450/800?random=${i}`,
+  video: films[i % films.length],
 }));
+console.log("medias=", medias);
 
 const r = 5;
 const TRANSLUCENCY = 0;
@@ -651,20 +660,8 @@ function Panels() {
   });
 
   //
-  // Materials
+  // fourMedias
   //
-
-  // Panels material color
-  // useEffect(() => {
-  //   const refs = [panel1Ref, panel2Ref, panel3Ref, panel4Ref];
-  //   refs.forEach((ref, i) => {
-  //     const color = circular(Math.floor(pos) - i + 2);
-  //     if (color && ref.current) {
-  //       const mat = ref.current.material as THREE.MeshStandardMaterial;
-  //       mat.color.setHex(color);
-  //     }
-  //   });
-  // }, [pos]);
 
   const posFloored = Math.floor(pos);
   const fourMedias = useMemo(() => {
@@ -676,11 +673,36 @@ function Panels() {
     ];
   }, [posFloored]);
 
+  //
+  // dynamic quality
+  //
+
+  const [quality, setQuality] =
+    useState<ComponentProps<typeof Screen>["quality"]>("best");
+  useFrame(() => {
+    let velocity = trackerRef.current.get("current");
+    // console.log("velocity=", velocity);
+    if (isNaN(velocity)) velocity = 0;
+
+    const v = Math.abs(velocity);
+    const stopped = v === 0 ? true : false;
+    // console.log("plop", stopped);
+
+    setQuality(stopped && !dragging ? "best" : "degraded");
+  });
+
+  //
   // Determine the most "central" video
+  //
+
   const centralVideo = useMemo(
     () => (mod(pos) > 0.5 ? "left" : "front"),
     [pos]
   );
+
+  //
+  // render
+  //
 
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
@@ -693,12 +715,14 @@ function Panels() {
             aspect={aspect}
             transparent
             opacity={STATES.backleft.opacity}
+            quality={quality}
           />
         </Panel>
         <Panel ref={panel2Ref} state="left" size={size}>
           <Screen
             media={fourMedias[1]}
             aspect={aspect}
+            quality={quality}
             // start={centralVideo === "left"}
           />
         </Panel>
@@ -706,6 +730,7 @@ function Panels() {
           <Screen
             media={fourMedias[2]}
             aspect={aspect}
+            quality={quality}
             // start={centralVideo === "front"}
           />
         </Panel>
@@ -715,6 +740,7 @@ function Panels() {
             aspect={aspect}
             transparent
             opacity={STATES.right.opacity}
+            quality={quality}
           />
         </Panel>
 
@@ -766,15 +792,15 @@ const Panel = forwardRef<
 
     const { bind } = useDrag();
 
-    // const roundedPlaneGeometry = useMemo(
-    //   () =>
-    //     new geometry.RoundedPlaneGeometry(...size.slice(0, 2), borderRadius),
-    //   [size, borderRadius]
-    // );
-    const planeGeometry = useMemo(
-      () => new THREE.PlaneGeometry(...size.slice(0, 2)),
-      [size]
+    const roundedPlaneGeometry = useMemo(
+      () =>
+        new geometry.RoundedPlaneGeometry(...size.slice(0, 2), borderRadius),
+      [size, borderRadius]
     );
+    // const planeGeometry = useMemo(
+    //   () => new THREE.PlaneGeometry(...size.slice(0, 2)),
+    //   [size]
+    // );
 
     return (
       <>
@@ -787,8 +813,8 @@ const Panel = forwardRef<
             {...props}
             {...(bind() as any)}
           >
-            {/* <primitive object={roundedPlaneGeometry} /> */}
-            <primitive object={planeGeometry} />
+            <primitive object={roundedPlaneGeometry} />
+            {/* <primitive object={planeGeometry} /> */}
             {children}
           </mesh>
         )}
@@ -809,31 +835,72 @@ const Panel = forwardRef<
 //      ██ ██      ██   ██ ██      ██      ██  ██ ██
 // ███████  ██████ ██   ██ ███████ ███████ ██   ████
 
+function Spinner({ Shape = Box }: { Shape?: typeof Box | typeof Sphere }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.rotation.z += 0.1;
+    }
+  });
+
+  const a = 0.2;
+
+  return (
+    <Shape args={Shape === Box ? [a, a, 0.01] : [a / 2, 8, 8]} ref={meshRef}>
+      <meshStandardMaterial color="hotpink" wireframe />
+    </Shape>
+  );
+}
+
 function Screen({
   media,
   aspect,
-  mode = "image",
+  quality = "best",
+  best = "image", // TODO: infine "video"
   start = false,
   ...props
 }: {
   media: (typeof medias)[number];
   aspect?: number;
-  mode?: "color" | "image" | "video";
+  quality?: "degraded" | "best";
+  best?: keyof typeof media; // "image" | "video" | "color";
   start?: boolean;
 } & ComponentProps<"meshStandardMaterial">) {
   // console.log("Screen");
+
+  let mode = best;
+  if (quality === "degraded") {
+    const imageLoaded = peek([media.image]);
+    const videoLoaded = peek([media.video]);
+    mode = videoLoaded ? "video" : imageLoaded ? "image" : "color";
+  }
 
   const commonProps = { side: THREE.DoubleSide, ...props };
   const imageVideoProps = { aspect };
 
   const color = <ColorMaterial color={media.color} {...commonProps} />;
   const image = (
-    <Suspense fallback={color}>
+    <Suspense
+      fallback={
+        <>
+          <Spinner />
+          {color}
+        </>
+      }
+    >
       <ImageMaterial src={media.image} {...commonProps} {...imageVideoProps} />
     </Suspense>
   );
   const video = (
-    <Suspense fallback={image}>
+    <Suspense
+      fallback={
+        <>
+          <Spinner Shape={Sphere} />
+          {image}
+        </>
+      }
+    >
       <VideoMaterial
         src={media.video}
         {...commonProps}
@@ -861,7 +928,12 @@ const useImageTexture = (src: string) => {
   const texture = suspend(
     () =>
       new Promise((resolve, reject) => {
-        new THREE.TextureLoader().load(src, resolve, undefined, reject);
+        new THREE.TextureLoader().load(
+          src,
+          (texture) => setTimeout(() => resolve(texture), 1000),
+          undefined,
+          reject
+        );
       }),
     [src]
   ) as THREE.Texture;
