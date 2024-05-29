@@ -163,6 +163,49 @@ function objectFit(r: number, R: number, size: "cover" | "contain" = "cover") {
   return { repeat, offset };
 }
 
+const useSmoothValue = (period = 1000) => {
+  type Value = {
+    value: number;
+    timestamp: number;
+  };
+
+  const valuesRef = useRef<Value[]>([]);
+
+  const add = (value: number, timestamp = performance.now()) => {
+    const o = {
+      value,
+      timestamp, // remember a timestamp for each value
+    } satisfies Value;
+
+    valuesRef.current.push(o);
+
+    return compute.bind(this, timestamp);
+  };
+
+  const compute = useCallback(
+    (now = performance.now()) => {
+      // Remove objects older than the period
+      const cutoffTime = now - period;
+      while (
+        valuesRef.current.length > 0 &&
+        valuesRef.current[0].timestamp < cutoffTime
+      ) {
+        valuesRef.current.shift();
+      }
+
+      // Calculate the average of the values in the queue
+      const sum = valuesRef.current.reduce((acc, { value }) => acc + value, 0);
+      const smoothedValue =
+        valuesRef.current.length > 0 ? sum / valuesRef.current.length : 0;
+
+      return smoothedValue;
+    },
+    [period]
+  );
+
+  return [add, compute] as const;
+};
+
 //
 // Constants
 //
@@ -677,6 +720,8 @@ function Panels() {
   // dynamic quality
   //
 
+  const [add] = useSmoothValue(1000);
+
   const [quality, setQuality] =
     useState<ComponentProps<typeof Screen>["quality"]>("best");
   useFrame(() => {
@@ -684,11 +729,14 @@ function Panels() {
     // console.log("velocity=", velocity);
     if (isNaN(velocity)) velocity = 0;
 
+    const smoothedVelocity = add(velocity)();
+    console.log("smoothedVelocity", smoothedVelocity);
+
     const v = Math.abs(velocity);
-    const stopped = v === 0 ? true : false;
+    const motionless = v === 0 ? true : false;
     // console.log("plop", stopped);
 
-    setQuality(stopped && !dragging ? "best" : "degraded");
+    setQuality(motionless && !dragging ? "best" : "degraded");
   });
 
   //
@@ -930,7 +978,7 @@ const useImageTexture = (src: string) => {
       new Promise((resolve, reject) => {
         new THREE.TextureLoader().load(
           src,
-          (texture) => setTimeout(() => resolve(texture), 1000),
+          (texture) => setTimeout(() => resolve(texture), 0),
           undefined,
           reject
         );
