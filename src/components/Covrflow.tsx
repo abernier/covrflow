@@ -717,7 +717,7 @@ function Panels() {
   }, [posFloored]);
 
   //
-  // dynamic quality
+  // dynamic quality (based on smoothed velocity)
   //
 
   const [add] = useSmoothValue(1000);
@@ -730,13 +730,16 @@ function Panels() {
     if (isNaN(velocity)) velocity = 0;
 
     const smoothedVelocity = add(velocity)();
-    console.log("smoothedVelocity", smoothedVelocity);
+    // console.log("smoothedVelocity", smoothedVelocity);
 
     const v = Math.abs(velocity);
     const motionless = v === 0 ? true : false;
-    // console.log("plop", stopped);
+    // const v = Math.abs(smoothedVelocity);
+    // const motionless = v < 1 ? true : false;
 
-    setQuality(motionless && !dragging ? "best" : "degraded");
+    const q = motionless && !dragging ? "best" : "degraded";
+    console.log("quality", q);
+    setQuality(q);
   });
 
   //
@@ -929,6 +932,22 @@ function Screen({
 
   const color = <ColorMaterial color={media.color} {...commonProps} />;
   const image = (
+    <ImageMaterial src={media.image} {...commonProps} {...imageVideoProps} />
+  );
+  const video = (
+    <VideoMaterial
+      src={media.video}
+      {...commonProps}
+      {...imageVideoProps}
+      videoTextureProps={{
+        start,
+        preload: "metadata",
+        unsuspend: "loadedmetadata",
+      }}
+    />
+  );
+
+  return (
     <Suspense
       fallback={
         <>
@@ -937,32 +956,15 @@ function Screen({
         </>
       }
     >
-      <ImageMaterial src={media.image} {...commonProps} {...imageVideoProps} />
-    </Suspense>
-  );
-  const video = (
-    <Suspense
-      fallback={
-        <>
-          <Spinner Shape={Sphere} />
-          {image}
-        </>
+      {
+        {
+          color,
+          image,
+          video,
+        }[mode]
       }
-    >
-      <VideoMaterial
-        src={media.video}
-        {...commonProps}
-        {...imageVideoProps}
-        videoTextureProps={{ start }}
-      />
     </Suspense>
   );
-
-  return {
-    color,
-    image,
-    video,
-  }[mode];
 }
 
 function ColorMaterial({
@@ -1004,6 +1006,10 @@ function ImageMaterial({
   const imageTexture = useImageTexture(src);
 
   const image = imageTexture.image as HTMLImageElement;
+
+  useEffect(() => {
+    return () => void imageTexture.dispose();
+  }, [imageTexture]);
 
   useEffect(() => {
     if (image && aspect) {
@@ -1050,6 +1056,10 @@ function VideoMaterial({
     },
     ...videoTextureProps,
   });
+
+  useEffect(() => {
+    return () => void videoTexture.dispose();
+  }, [videoTexture]);
 
   const video = videoTexture.image as HTMLVideoElement;
 
