@@ -757,6 +757,10 @@ function Panels() {
 
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
+
+  const SLOW_EMOUGH = 5; // won't start if greater
+  const slowEnough = Math.abs(trackerRef.current.get("current")) <= SLOW_EMOUGH;
+
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
@@ -774,7 +778,7 @@ function Panels() {
             media={fourMedias[1]}
             aspect={aspect}
             quality={quality}
-            start={centralVideo === "left"}
+            start={centralVideo === "left" && slowEnough}
           />
         </Panel>
         <Panel ref={panel3Ref} state="front" size={size}>
@@ -782,7 +786,7 @@ function Panels() {
             media={fourMedias[2]}
             aspect={aspect}
             quality={quality}
-            start={centralVideo === "front"}
+            start={centralVideo === "front" && slowEnough}
           />
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>
