@@ -238,7 +238,7 @@ const films = [
   // "05.mp4",
 ];
 
-const medias = Array.from({ length: 20 }).map((_, i) => ({
+const medias = Array.from({ length: 100 }).map((_, i) => ({
   color: kulers[i % kulers.length],
   image: `https://picsum.photos/450/800?random=${i}`,
   video: films[i % films.length],
@@ -720,22 +720,22 @@ function Panels() {
   // dynamic quality (based on smoothed velocity)
   //
 
-  const [add] = useSmoothValue(1000);
+  const [add] = useSmoothValue(100);
 
   const [quality, setQuality] =
-    useState<ComponentProps<typeof Screen>["quality"]>("best");
+    useState<ComponentProps<typeof Screen>["quality"]>("degraded");
   useFrame(() => {
     let velocity = trackerRef.current.get("current");
     // console.log("velocity=", velocity);
     if (isNaN(velocity)) velocity = 0;
 
-    const smoothedVelocity = add(velocity)();
-    // console.log("smoothedVelocity", smoothedVelocity);
+    const smoothedVelocity = add(velocity + (dragging ? 0.1 : 0))(); // if dragging: never go 0 (even if still)! so when releasing, quality is not suddenly "best", but has to smooth to 0
+    console.log("smoothedVelocity", smoothedVelocity);
 
-    const v = Math.abs(velocity);
-    const motionless = v === 0 ? true : false;
-    // const v = Math.abs(smoothedVelocity);
-    // const motionless = v < 1 ? true : false;
+    // const v = Math.abs(velocity);
+    // const motionless = v === 0
+    const v = Math.abs(smoothedVelocity);
+    const motionless = v === 0;
 
     const q = motionless && !dragging ? "best" : "degraded";
     console.log("quality", q);
