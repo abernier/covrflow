@@ -771,6 +771,7 @@ function Panels() {
             transparent
             opacity={STATES.backleft.opacity}
             quality={quality}
+            spinner={false}
           />
         </Panel>
         <Panel ref={panel2Ref} state="left" size={size}>
@@ -778,7 +779,7 @@ function Panels() {
             media={fourMedias[1]}
             aspect={aspect}
             quality={quality}
-            start={centralVideo === "left" && slowEnough}
+            // start={centralVideo === "left" && slowEnough}
           />
         </Panel>
         <Panel ref={panel3Ref} state="front" size={size}>
@@ -786,7 +787,7 @@ function Panels() {
             media={fourMedias[2]}
             aspect={aspect}
             quality={quality}
-            start={centralVideo === "front" && slowEnough}
+            // start={centralVideo === "front" && slowEnough}
           />
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>
@@ -918,8 +919,9 @@ function Screen({
   media,
   aspect,
   quality = "best",
-  best = "video", // TODO: infine "video"
+  best = "color", // TODO: infine "video"
   start = false,
+  spinner = true,
   ...props
 }: {
   media: (typeof medias)[number];
@@ -927,6 +929,7 @@ function Screen({
   quality?: "degraded" | "best";
   best?: keyof typeof media; // "image" | "video" | "color";
   start?: boolean;
+  spinner?: boolean;
 } & ComponentProps<"meshStandardMaterial">) {
   // console.log("Screen");
 
@@ -947,12 +950,16 @@ function Screen({
   const commonProps = { side: THREE.DoubleSide, ...props };
   const imageVideoProps = { aspect };
 
+  //
+  // color < image < video (nested)
+  //
+
   const color = <ColorMaterial color={media.color} {...commonProps} />;
   const image = (
     <Suspense
       fallback={
         <>
-          <Spinner color="orange" />
+          {spinner && <Spinner color="orange" />}
           {color}
         </>
       }
@@ -964,7 +971,7 @@ function Screen({
     <Suspense
       fallback={
         <>
-          <Spinner color="red" />
+          {spinner && <Spinner color="red" />}
           {image}
         </>
       }
