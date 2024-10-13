@@ -408,6 +408,7 @@ export const CovrflowProvider = forwardRef<
           },
           onComplete() {
             posTargetRef.current = inertiaValueRef.current;
+            setDragging(false);
           },
         }
       );
@@ -428,6 +429,7 @@ export const CovrflowProvider = forwardRef<
       posTargetRef.current = newPosTarget;
 
       if (damping) {
+        setDragging(true);
         damp(() => gsap.utils.snap(1)(newPosTarget));
       } else {
         setPos(newPosTarget);
@@ -730,7 +732,7 @@ function Panels() {
     if (isNaN(velocity)) velocity = 0;
 
     const smoothedVelocity = add(velocity + (dragging ? 0.1 : 0))(); // if dragging: never go 0 (even if still)! so when releasing, quality is not suddenly "best", but has to smooth to 0
-    console.log("smoothedVelocity", smoothedVelocity);
+    // console.log("smoothedVelocity", smoothedVelocity);
 
     // const v = Math.abs(velocity);
     // const motionless = v === 0
@@ -919,7 +921,7 @@ function Screen({
   media,
   aspect,
   quality = "best",
-  best = "color", // TODO: infine "video"
+  best = "video",
   start = false,
   spinner = true,
   ...props
