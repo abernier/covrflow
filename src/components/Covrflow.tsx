@@ -886,7 +886,13 @@ const Panel = forwardRef<
 //      ██ ██      ██   ██ ██      ██      ██  ██ ██
 // ███████  ██████ ██   ██ ███████ ███████ ██   ████
 
-function Spinner({ Shape = Box }: { Shape?: typeof Box | typeof Sphere }) {
+function Spinner({
+  Shape = Box,
+  color = "hotpink",
+}: {
+  Shape?: typeof Box | typeof Sphere;
+  color?: ComponentProps<"meshStandardMaterial">["color"];
+}) {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame(() => {
@@ -899,7 +905,7 @@ function Spinner({ Shape = Box }: { Shape?: typeof Box | typeof Sphere }) {
 
   return (
     <Shape args={Shape === Box ? [a, a, 0.01] : [a / 2, 8, 8]} ref={meshRef}>
-      <meshStandardMaterial color="hotpink" wireframe />
+      <meshStandardMaterial color={color} wireframe />
     </Shape>
   );
 }
@@ -908,7 +914,7 @@ function Screen({
   media,
   aspect,
   quality = "best",
-  best = "image", // TODO: infine "video"
+  best = "video", // TODO: infine "video"
   start = false,
   ...props
 }: {
@@ -920,11 +926,18 @@ function Screen({
 } & ComponentProps<"meshStandardMaterial">) {
   // console.log("Screen");
 
-  let mode = best;
+  //
+  // Best in class `mode`
+  //
+  // 1. by default, mode has the `best` prop value (eg: "video")
+  // 2. but if quality is "degraded", mode degrades to "color" (or higher values, if already loaded)
+  //
+
+  let mode = best; // 1.
   if (quality === "degraded") {
     const imageLoaded = peek([media.image]);
     const videoLoaded = peek([media.video]);
-    mode = videoLoaded ? "video" : imageLoaded ? "image" : "color";
+    mode = videoLoaded ? "video" : imageLoaded ? "image" : "color"; // 2.
   }
 
   const commonProps = { side: THREE.DoubleSide, ...props };
@@ -932,39 +945,44 @@ function Screen({
 
   const color = <ColorMaterial color={media.color} {...commonProps} />;
   const image = (
-    <ImageMaterial src={media.image} {...commonProps} {...imageVideoProps} />
-  );
-  const video = (
-    <VideoMaterial
-      src={media.video}
-      {...commonProps}
-      {...imageVideoProps}
-      videoTextureProps={{
-        start,
-        preload: "metadata",
-        unsuspend: "loadedmetadata",
-      }}
-    />
-  );
-
-  return (
     <Suspense
       fallback={
         <>
-          <Spinner />
+          <Spinner color="orange" />
           {color}
         </>
       }
     >
-      {
-        {
-          color,
-          image,
-          video,
-        }[mode]
-      }
+      <ImageMaterial src={media.image} {...commonProps} {...imageVideoProps} />
     </Suspense>
   );
+  const video = (
+    <Suspense
+      fallback={
+        <>
+          <Spinner color="red" />
+          {image}
+        </>
+      }
+    >
+      <VideoMaterial
+        src={media.video}
+        {...commonProps}
+        {...imageVideoProps}
+        videoTextureProps={{
+          start,
+          preload: "metadata",
+          unsuspend: "loadedmetadata",
+        }}
+      />
+    </Suspense>
+  );
+
+  return {
+    color,
+    image,
+    video,
+  }[mode];
 }
 
 function ColorMaterial({
