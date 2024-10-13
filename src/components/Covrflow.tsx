@@ -774,7 +774,7 @@ function Panels() {
             media={fourMedias[1]}
             aspect={aspect}
             quality={quality}
-            // start={centralVideo === "left"}
+            start={centralVideo === "left"}
           />
         </Panel>
         <Panel ref={panel3Ref} state="front" size={size}>
@@ -782,7 +782,7 @@ function Panels() {
             media={fourMedias[2]}
             aspect={aspect}
             quality={quality}
-            // start={centralVideo === "front"}
+            start={centralVideo === "front"}
           />
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>

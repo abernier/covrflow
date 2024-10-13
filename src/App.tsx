@@ -93,8 +93,8 @@ function Scene() {
     nav: buttonGroup({
       label: "navigation",
       opts: {
-        prev: () => covrflowRef.current?.go((val) => val - 1),
-        next: () => covrflowRef.current?.go((val) => val + 1),
+        left: () => covrflowRef.current?.go((val) => val - 1),
+        right: () => covrflowRef.current?.go((val) => val + 1),
       },
     }),
     sensitivity: {
