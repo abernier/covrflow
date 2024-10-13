@@ -16,13 +16,8 @@ import {
   useEffect,
   Suspense,
 } from "react";
-import {
-  Box,
-  Sphere,
-  Text,
-  // useVideoTexture
-} from "@react-three/drei";
-import { useVideoTexture } from "./tmp/useTexture";
+import { Box, Sphere, Text, useVideoTexture } from "@react-three/drei";
+
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
