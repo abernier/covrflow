@@ -23,18 +23,22 @@ import {
 } from "@react-three/xr";
 import gsap from "gsap";
 import {
+  keepPreviousData,
   QueryClient,
   QueryClientProvider,
+  useInfiniteQuery,
   useQuery,
 } from "@tanstack/react-query";
 
 import Layout from "./Layout";
 import { Covrflow, Media, useCovrflow } from "./components/Covrflow";
-import { Leva, buttonGroup, useControls } from "leva";
+import { Leva, buttonGroup, folder, useControls } from "leva";
 import { Mesh, Object3D } from "three";
 import { type Videos } from "pexels";
 
 const queryClient = new QueryClient();
+
+const VITE_PEXELS_API_KEY: string = import.meta.env.VITE_PEXELS_API_KEY;
 
 function App() {
   const gui = useControls({
@@ -90,7 +94,6 @@ function Scene() {
   // });
 
   const [gui, setGui] = useControls(() => ({
-    query: "romance",
     pos: {
       value: 0,
       disabled: true,
@@ -121,6 +124,21 @@ function Scene() {
       max: 2,
     },
     debug: false,
+    pexels: folder(
+      {
+        query: "romance",
+        perPage: 10,
+        size: {
+          value: "small" as const,
+          options: ["small", "medium", "large"] as const,
+        },
+        orientation: {
+          value: "portrait" as const,
+          options: ["portrait", "landscape", "square"] as const,
+        },
+      },
+      { collapsed: true }
+    ),
   }));
 
   // sync coverflow `pos` to GUI
@@ -195,7 +213,15 @@ function Scene() {
         }}
         medias={medias}
       >
-        <Medias query={gui.query} set={setMedias} />
+        <Medias
+          query={gui.query}
+          set={setMedias}
+          options={{
+            size: gui.size,
+            orientation: gui.orientation,
+            perPage: gui.perPage,
+          }}
+        />
       </Covrflow>
 
       {/* <Box ref={boxRef} args={[6, 6, 6]} /> */}
@@ -206,40 +232,74 @@ function Scene() {
 function Medias({
   query,
   set,
+  options = {
+    size: "small",
+    perPage: 10,
+    orientation: "portrait",
+  },
 }: {
   query: string;
-  set: Dispatch<SetStateAction<Media[] | undefined>>;
+  set: (data: Media[]) => void;
+  options?: {
+    size?: "small" | "medium" | "large";
+    orientation?: "portrait" | "landscape" | "square";
+    perPage: number;
+  };
 }) {
   const {
     posState: [pos],
   } = useCovrflow();
 
-  const perPage = 20;
-  const page = Math.ceil(Math.abs(pos) / perPage);
-  console.log("page=", page);
+  const page = Math.ceil(Math.abs(pos) / options.perPage + 0.0001);
+  // console.log("page=", page);
 
-  const { data } = useQuery({
-    queryKey: [query, perPage, page],
-    queryFn: async () => {
-      const response = await fetch(
-        `https://api.pexels.com/videos/search?query=${query}&orientation=portrait&size=small&per_page=${perPage}&page=${page}`,
-        {
-          headers: {
-            Authorization: import.meta.env.VITE_PEXELS_API_KEY,
-          },
-        }
-      );
-      const json: Videos = await response.json();
+  const fetchMedias = async ({ pageParam }: { pageParam: number }) => {
+    const response = await fetch(
+      `https://api.pexels.com/videos/search?query=${query}&orientation=${options.orientation}&size=${options.size}&per_page=${options.perPage}&page=${pageParam}`,
+      {
+        headers: {
+          Authorization: VITE_PEXELS_API_KEY,
+        },
+      }
+    );
+    const json: Videos = await response.json();
 
-      return json.videos.map((v) => ({
-        color: "gray",
-        image: v.video_pictures.find((p) => p.nr === 0)!.picture,
-        video: v.video_files[0].link,
-      }));
-    },
+    return json.videos.map(({ video_pictures, video_files }) => ({
+      color: "gray",
+      image: video_pictures.find(({ nr }) => nr === 0)!.picture,
+      video: video_files[0].link,
+    }));
+  };
+
+  const { data, fetchNextPage } = useInfiniteQuery({
+    queryKey: [
+      "medias",
+      query,
+      options.perPage,
+      options.size,
+      options.orientation,
+    ],
+    queryFn: fetchMedias,
+    initialPageParam: page,
+    // placeholderData: keepPreviousData,
+    getNextPageParam: () => page,
   });
 
-  set(data);
+  useEffect(() => {
+    // console.log("page=", page);
+    if (!data?.pageParams.includes(page)) {
+      fetchNextPage();
+    }
+  }, [data?.pageParams, fetchNextPage, page]);
+
+  useEffect(() => {
+    if (data) {
+      // console.log("data=", data);
+      const medias = data.pages.flat();
+
+      set(medias);
+    }
+  }, [data, set]);
 
   return null;
 }

@@ -727,10 +727,10 @@ function Panels() {
   const posFloored = Math.floor(pos);
   const fourMedias = useMemo(() => {
     return [
-      medias && circ(medias, posFloored + 2), // backleft
-      medias && circ(medias, posFloored + 1), // left
-      medias && circ(medias, posFloored + 0), // front
-      medias && circ(medias, posFloored - 1), // right
+      medias && circ(medias, posFloored + 2, false), // backleft
+      medias && circ(medias, posFloored + 1, false), // left
+      medias && circ(medias, posFloored + 0, false), // front
+      medias && circ(medias, posFloored - 1, false), // right
     ];
   }, [medias, posFloored]);
 
@@ -756,7 +756,7 @@ function Panels() {
     const motionless = v === 0;
 
     const q = motionless && !dragging ? "best" : "degraded";
-    console.log("quality", q);
+    // console.log("quality", q);
     setQuality(q);
   });
 
