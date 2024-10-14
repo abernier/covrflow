@@ -17,7 +17,7 @@ import {
   Suspense,
   ReactNode,
 } from "react";
-import { Box, Sphere, Text, useVideoTexture } from "@react-three/drei";
+import { Box, Sphere, useVideoTexture } from "@react-three/drei";
 
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -29,15 +29,10 @@ import {
 } from "@use-gesture/react";
 import { animated, useSpring } from "@react-spring/three";
 import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
-import { Interactive, useInteraction } from "@react-three/xr";
-import { Vector2 } from "three";
 import merge from "deepmerge";
 import { invalidate, useFrame } from "@react-three/fiber";
 import * as geometry from "maath/geometry";
 import { suspend, peek } from "suspend-react";
-import { useQuery } from "@tanstack/react-query";
-
-import type { Videos } from "pexels";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -209,43 +204,8 @@ const useSmoothValue = (period = 1000) => {
 // Constants
 //
 
-const kulers = [
-  0xecfdf5, 0xd1fae5, 0xa7f3d0, 0x6ee7b7, 0x34d399, 0x10b981, 0x059669,
-  0x047857, 0x065f46, 0x064e3b, 0x022c22,
-].reverse();
-
-// List of films from https://gist.github.com/jsturgis/3b19447b304616f18657
-const films = [
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
-  "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4",
-
-  // "01.mp4",
-  // "02.mp4",
-  // "03.mp4",
-  // "04.mp4",
-  // "05.mp4",
-];
-
-// const medias = Array.from({ length: 100 }).map((_, i) => ({
-//   color: kulers[i % kulers.length],
-//   image: `https://picsum.photos/450/800?random=${i}`,
-//   video: films[i % films.length],
-// }));
-// console.log("medias=", medias);
-
 export type Media = {
-  color: string;
+  color: THREE.Color | string;
   image: string;
   video: string;
 };
@@ -726,11 +686,13 @@ function Panels() {
 
   const posFloored = Math.floor(pos);
   const fourMedias = useMemo(() => {
+    if (!medias) return [undefined, undefined, undefined, undefined];
+
     return [
-      medias && circ(medias, posFloored + 2, false), // backleft
-      medias && circ(medias, posFloored + 1, false), // left
-      medias && circ(medias, posFloored + 0, false), // front
-      medias && circ(medias, posFloored - 1, false), // right
+      circ(medias, posFloored + 2, false), // backleft
+      circ(medias, posFloored + 1, false), // left
+      circ(medias, posFloored + 0, false), // front
+      circ(medias, posFloored - 1, false), // right
     ];
   }, [medias, posFloored]);
 
@@ -945,7 +907,7 @@ function Screen({
   media?: Media;
   aspect?: number;
   quality?: "degraded" | "best";
-  best?: keyof NonNullable<typeof media>; // "image" | "video" | "color";
+  best?: keyof Media; // "image" | "video" | "color";
   start?: boolean;
   spinner?: boolean;
 } & ComponentProps<"meshStandardMaterial">) {
