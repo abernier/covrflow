@@ -14,8 +14,11 @@ import {
   Dispatch,
   SetStateAction,
   useEffect,
+  Suspense,
+  ReactNode,
 } from "react";
-import { Box } from "@react-three/drei";
+import { Box, Sphere, useVideoTexture } from "@react-three/drei";
+
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
@@ -26,11 +29,10 @@ import {
 } from "@use-gesture/react";
 import { animated, useSpring } from "@react-spring/three";
 import { InertiaPlugin, VelocityTracker } from "gsap/InertiaPlugin";
-import { Interactive, useInteraction } from "@react-three/xr";
-import { Vector2 } from "three";
 import merge from "deepmerge";
 import { invalidate, useFrame } from "@react-three/fiber";
 import * as geometry from "maath/geometry";
+import { suspend, peek } from "suspend-react";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -39,10 +41,6 @@ const useGesture = createUseGesture([dragAction, pinchAction]);
 //
 // Utilities
 //
-
-function circular(i: number) {
-  return circ(content, i);
-}
 
 //
 // circ
@@ -129,16 +127,92 @@ const createRequiredContext = <T,>() => {
   return [useCtx, Ctx.Provider] as const;
 };
 
+function objectFit(r: number, R: number, size: "cover" | "contain" = "cover") {
+  // https://stackoverflow.com/a/78535892/133327
+
+  const { repeat, offset } = new THREE.Texture();
+
+  if (size === "cover") {
+    if (r > R) {
+      repeat.x = R / r;
+      repeat.y = 1;
+    } else {
+      repeat.x = 1;
+      repeat.y = r / R;
+    }
+  } else {
+    if (r > R) {
+      repeat.x = 1;
+      repeat.y = r / R;
+    } else {
+      repeat.x = R / r;
+      repeat.y = 1;
+    }
+  }
+
+  // center
+  offset.y = (1 - repeat.y) / 2;
+  offset.x = (1 - repeat.x) / 2;
+
+  return { repeat, offset };
+}
+
+const useSmoothValue = (period = 1000) => {
+  type Value = {
+    value: number;
+    timestamp: number;
+  };
+
+  const valuesRef = useRef<Value[]>([]);
+
+  const add = (value: number, timestamp = performance.now()) => {
+    const o = {
+      value,
+      timestamp, // remember a timestamp for each value
+    } satisfies Value;
+
+    valuesRef.current.push(o);
+
+    return compute.bind(this, timestamp);
+  };
+
+  const compute = useCallback(
+    (now = performance.now()) => {
+      // Remove objects older than the period
+      const cutoffTime = now - period;
+      while (
+        valuesRef.current.length > 0 &&
+        valuesRef.current[0].timestamp < cutoffTime
+      ) {
+        valuesRef.current.shift();
+      }
+
+      // Calculate the average of the values in the queue
+      const sum = valuesRef.current.reduce((acc, { value }) => acc + value, 0);
+      const smoothedValue =
+        valuesRef.current.length > 0 ? sum / valuesRef.current.length : 0;
+
+      return smoothedValue;
+    },
+    [period]
+  );
+
+  return [add, compute] as const;
+};
+
 //
 // Constants
 //
 
-const content = [
-  0xecfdf5, 0xd1fae5, 0xa7f3d0, 0x6ee7b7, 0x34d399, 0x10b981, 0x059669,
-  0x047857, 0x065f46, 0x064e3b, 0x022c22,
-].reverse();
+export type Media = {
+  color: THREE.Color | string;
+  image: string;
+  video: string;
+};
+export type Medias = Media[];
 
 const r = 5;
+const TRANSLUCENCY = 0;
 const STATES = {
   backleft: {
     position: [
@@ -147,7 +221,7 @@ const STATES = {
       -1.5 * r * Math.sin(Math.PI / 3),
     ],
     rotation: [0, Math.PI / 3, 0],
-    opacity: 0,
+    opacity: TRANSLUCENCY,
   },
   left: {
     position: [-r * Math.cos(Math.PI / 3), 0, -r * Math.sin(Math.PI / 3)],
@@ -171,7 +245,7 @@ const STATES = {
       -1.5 * r * Math.sin(Math.PI / 3),
     ],
     rotation: [0, -Math.PI / 3, 0],
-    opacity: 0,
+    opacity: TRANSLUCENCY,
   },
 } satisfies {
   [k in "backleft" | "left" | "front" | "right" | "backright"]: {
@@ -197,13 +271,16 @@ type Options = typeof defaultOptions;
 export const Covrflow = forwardRef<
   ElementRef<typeof CovrflowProvider>,
   {
+    children: ReactNode;
+    medias?: Medias;
     options?: Options;
   } & ComponentProps<"group">
->(({ options, ...props }, ref) => {
+>(({ children, medias, options, ...props }, ref) => {
   return (
     <group {...props}>
-      <CovrflowProvider ref={ref} options={options}>
+      <CovrflowProvider ref={ref} medias={medias} options={options}>
         <Panels />
+        {children}
       </CovrflowProvider>
     </group>
   );
@@ -223,6 +300,8 @@ type Api = {
   posState: [Pos, Dispatch<SetStateAction<Pos>>];
   posTargetRef: PosRef;
 
+  draggingState: [boolean, Dispatch<SetStateAction<boolean>>];
+
   tlPanels: MutableRefObject<gsap.core.Timeline>;
   seat: MutableRefObject<Seat>;
 
@@ -236,18 +315,21 @@ type Api = {
     damping?: boolean
   ) => void;
 
+  medias?: Medias;
   options: Options;
 };
 
 const [useCovrflow, Provider] = createRequiredContext<Api>();
+export { useCovrflow };
 
 export const CovrflowProvider = forwardRef<
   Api,
   {
     children: React.ReactNode;
     options?: Partial<Options>;
+    medias?: Medias;
   }
->(({ children, options = {} }, ref) => {
+>(({ children, medias, options = {} }, ref) => {
   // console.log("CovrflowProvider");
 
   const opts = merge(defaultOptions, options, {
@@ -256,6 +338,8 @@ export const CovrflowProvider = forwardRef<
 
   const [pos, setPos] = useState(0);
   const posTargetRef = useRef(0);
+
+  const [dragging, setDragging] = useState(false);
 
   // frameloop="demand" https://docs.pmnd.rs/react-three-fiber/advanced/scaling-performance#on-demand-rendering
   useEffect(() => invalidate(), [pos]);
@@ -296,6 +380,7 @@ export const CovrflowProvider = forwardRef<
           },
           onComplete() {
             posTargetRef.current = inertiaValueRef.current;
+            setDragging(false);
           },
         }
       );
@@ -308,10 +393,15 @@ export const CovrflowProvider = forwardRef<
       const newPosTarget =
         typeof x === "function" ? x(posTargetRef.current) : x;
 
-      console.log("go from %s to %s", posTargetRef.current, newPosTarget);
+      console.log(
+        "navigating from %s to %s",
+        posTargetRef.current,
+        newPosTarget
+      );
       posTargetRef.current = newPosTarget;
 
       if (damping) {
+        setDragging(true);
         damp(() => gsap.utils.snap(1)(newPosTarget));
       } else {
         setPos(newPosTarget);
@@ -326,6 +416,8 @@ export const CovrflowProvider = forwardRef<
       posState: [pos, setPos],
       posTargetRef,
 
+      draggingState: [dragging, setDragging],
+
       tlPanels,
       seat,
 
@@ -336,9 +428,10 @@ export const CovrflowProvider = forwardRef<
       go,
       damp,
 
+      medias,
       options: opts,
     }),
-    [pos, go, damp, opts]
+    [pos, dragging, go, damp, medias, opts]
   ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
@@ -366,6 +459,7 @@ function useDrag({
     twInertia,
     posState: [, setPos],
     posTargetRef,
+    draggingState: [, setDragging],
     seat,
     damp,
     options,
@@ -374,6 +468,8 @@ function useDrag({
   const bind = useGesture({
     onDragStart({ event }) {
       // console.log("onDragStart");
+
+      setDragging(true);
 
       // Taking the seat if available
       if (seat.current !== null) return; // if not => skip
@@ -406,6 +502,8 @@ function useDrag({
       // if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
 
       damp();
+
+      setDragging(false);
     },
   });
 
@@ -424,25 +522,32 @@ function Panels() {
   const {
     tlPanels,
     posState: [pos],
+    draggingState: [dragging],
+    trackerRef,
     options,
+    medias,
   } = useCovrflow();
+
+  // console.log("medias=", medias);
 
   // sync timeline with pos
   useEffect(() => {
     const t = mod(pos); // [0..1]
-    tlPanels.current.seek(t);
+    tlPanels.current.seek(t, false); // 2nd param: `suppressEvents` to false to trigger `on*` callbacks (see: https://gsap.com/docs/v3/GSAP/Tween/seek()/)
   }, [pos, tlPanels]);
 
   //
   // Tweens
   //
 
-  const panel1Ref = useRef<ElementRef<typeof Box>>(null);
-  const panel2Ref = useRef<ElementRef<typeof Box>>(null);
-  const panel3Ref = useRef<ElementRef<typeof Box>>(null);
-  const panel4Ref = useRef<ElementRef<typeof Box>>(null);
+  const panel1Ref = useRef<ElementRef<"mesh">>(null);
+  const panel2Ref = useRef<ElementRef<"mesh">>(null);
+  const panel3Ref = useRef<ElementRef<"mesh">>(null);
+  const panel4Ref = useRef<ElementRef<"mesh">>(null);
 
   const { contextSafe } = useGSAP(() => {
+    console.log("useGSAP");
+
     if (
       !panel1Ref.current ||
       !panel2Ref.current ||
@@ -465,21 +570,24 @@ function Panels() {
       arr2vec(STATES.backleft.position),
       { ...arr2vec(STATES.left.position), duration, ease }
     );
+
     const tw1Rot = gsap.fromTo(
       panel1Ref.current.rotation,
       arr2vec(STATES.backleft.rotation),
       { ...arr2vec(STATES.left.rotation), duration, ease }
     );
-    const tw1Transparency = gsap.fromTo(
-      panel1Ref.current.material,
-      { opacity: STATES.backleft.opacity, transparent: true },
-      {
-        opacity: STATES.left.opacity,
-        transparent: true,
-        duration,
-        // ease: "circ.in",
-      }
-    );
+
+    const o1 = { opacity: STATES.backleft.opacity };
+    const tw1Transparency = gsap.fromTo(o1, o1, {
+      opacity: STATES.left.opacity,
+      duration,
+      // ease: "circ.in",
+      onUpdate() {
+        // console.log("onUpdate", o1);
+        const mat = panel1Ref.current?.material as THREE.MeshStandardMaterial;
+        mat.opacity = o1.opacity;
+      },
+    });
 
     tl1.add(tw1Rot, 0);
     tl1.add(tw1Pos, 0);
@@ -496,6 +604,7 @@ function Panels() {
       arr2vec(STATES.left.position),
       { ...arr2vec(STATES.front.position), duration, ease }
     );
+
     const tw2Rot = gsap.fromTo(
       panel2Ref.current.rotation,
       arr2vec(STATES.left.rotation),
@@ -516,6 +625,7 @@ function Panels() {
       arr2vec(STATES.front.position),
       { ...arr2vec(STATES.right.position), duration, ease }
     );
+
     const tw3Rot = gsap.fromTo(
       panel3Ref.current.rotation,
       arr2vec(STATES.front.rotation),
@@ -536,21 +646,24 @@ function Panels() {
       arr2vec(STATES.right.position),
       { ...arr2vec(STATES.backright.position), duration, ease }
     );
+
     const tw4Rot = gsap.fromTo(
       panel4Ref.current.rotation,
       arr2vec(STATES.right.rotation),
       { ...arr2vec(STATES.backright.rotation), duration, ease }
     );
-    const tw4Transparency = gsap.fromTo(
-      panel4Ref.current.material,
-      { opacity: STATES.right.opacity, transparent: true },
-      {
-        opacity: STATES.backright.opacity,
-        transparent: true,
-        duration,
-        // ease: "circ.in",
-      }
-    );
+
+    const o4 = { opacity: STATES.right.opacity };
+    const tw4Transparency = gsap.fromTo(o4, o4, {
+      opacity: STATES.backright.opacity,
+      duration,
+      // ease: "circ.in",
+      onUpdate() {
+        // console.log("onUpdate", o4);
+        const mat = panel4Ref.current?.material as THREE.MeshStandardMaterial;
+        mat.opacity = o4.opacity;
+      },
+    });
 
     tl4.add(tw4Rot, 0);
     tl4.add(tw4Pos, 0);
@@ -568,32 +681,106 @@ function Panels() {
   });
 
   //
-  //
+  // fourMedias
   //
 
-  // Panels material color
+  const posFloored = Math.floor(pos);
+  const fourMedias = useMemo(() => {
+    if (!medias) return [undefined, undefined, undefined, undefined];
+
+    return [
+      circ(medias, posFloored + 2, false), // backleft
+      circ(medias, posFloored + 1, false), // left
+      circ(medias, posFloored + 0, false), // front
+      circ(medias, posFloored - 1, false), // right
+    ];
+  }, [medias, posFloored]);
+
+  //
+  // dynamic quality (based on smoothed velocity)
+  //
+
+  const [add] = useSmoothValue(100);
+
+  const [quality, setQuality] =
+    useState<ComponentProps<typeof Screen>["quality"]>("degraded");
   useFrame(() => {
-    const refs = [panel1Ref, panel2Ref, panel3Ref, panel4Ref];
-    refs.forEach((ref, i) => {
-      const color = circular(Math.floor(pos) - i + 2);
-      if (color && ref.current) {
-        const mat = ref.current.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(color);
-      }
-    });
+    let velocity = trackerRef.current.get("current");
+    // console.log("velocity=", velocity);
+    if (isNaN(velocity)) velocity = 0;
+
+    const smoothedVelocity = add(velocity + (dragging ? 0.1 : 0))(); // if dragging: never go 0 (even if still)! so when releasing, quality is not suddenly "best", but has to smooth to 0
+    // console.log("smoothedVelocity", smoothedVelocity);
+
+    // const v = Math.abs(velocity);
+    // const motionless = v === 0
+    const v = Math.abs(smoothedVelocity);
+    const motionless = v === 0;
+
+    const q = motionless && !dragging ? "best" : "degraded";
+    // console.log("quality", q);
+    setQuality(q);
   });
+
+  //
+  // Determine the most "central" video
+  //
+
+  const centralVideo = useMemo(
+    () => (mod(pos) > 0.5 ? "left" : "front"),
+    [pos]
+  );
+
+  //
+  // render
+  //
 
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
+
+  const SLOW_EMOUGH = 5; // won't start if greater
+  const slowEnough = Math.abs(trackerRef.current.get("current")) <= SLOW_EMOUGH;
+
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
-        <Panel name="backleft" ref={panel1Ref} state="backleft" size={size} />
-        <Panel name="left" ref={panel2Ref} state="left" size={size} />
-        <Panel name="front" ref={panel3Ref} state="front" size={size} />
-        <Panel name="right" ref={panel4Ref} state="right" size={size} />
+        <Panel ref={panel1Ref} state="backleft" size={size}>
+          <Screen
+            media={fourMedias[0]}
+            aspect={aspect}
+            transparent
+            opacity={STATES.backleft.opacity}
+            quality={quality}
+            spinner={false}
+          />
+        </Panel>
+        <Panel ref={panel2Ref} state="left" size={size}>
+          <Screen
+            media={fourMedias[1]}
+            aspect={aspect}
+            quality={quality}
+            start={centralVideo === "left" && slowEnough}
+          />
+        </Panel>
+        <Panel ref={panel3Ref} state="front" size={size}>
+          <Screen
+            media={fourMedias[2]}
+            aspect={aspect}
+            quality={quality}
+            start={centralVideo === "front" && slowEnough}
+          />
+        </Panel>
+        <Panel ref={panel4Ref} state="right" size={size}>
+          <Screen
+            media={fourMedias[3]}
+            aspect={aspect}
+            transparent
+            opacity={STATES.right.opacity}
+            quality={quality}
+          />
+        </Panel>
 
-        <Panel name="backright" state="backright" debugOnly size={size} />
+        <Panel state="backright" debugOnly size={size} />
       </group>
 
       {options.debug && <Seeker />}
@@ -608,12 +795,12 @@ function Panels() {
 // ██      ██   ██ ██   ████ ███████ ███████
 
 const Panel = forwardRef<
-  ElementRef<typeof Box>,
-  ComponentProps<typeof Box> & {
+  ElementRef<"mesh">,
+  ComponentProps<"mesh"> & {
     state: keyof typeof STATES;
     debug?: boolean;
     debugOnly?: boolean;
-    size?: [number, number, number];
+    size: [number, number, number];
     borderRadius?: number;
   }
 >(
@@ -641,82 +828,19 @@ const Panel = forwardRef<
 
     const { bind } = useDrag();
 
-    // const [_pointer] = useState(new Vector2());
-    // const [_event] = useState({ type: "", data: _pointer });
-
-    // const dragging = useRef(false);
-
     const roundedPlaneGeometry = useMemo(
       () =>
         new geometry.RoundedPlaneGeometry(...size.slice(0, 2), borderRadius),
       [size, borderRadius]
     );
+    // const planeGeometry = useMemo(
+    //   () => new THREE.PlaneGeometry(...size.slice(0, 2)),
+    //   [size]
+    // );
 
     return (
       <>
         {!debugOnly && (
-          // <Interactive
-          //   onSelectStart={(e) => {
-          //     console.log("onSelectStart", e);
-
-          //     dragging.current = true;
-
-          //     if (!e.intersection?.uv) return;
-
-          //     const uv = e.intersection?.uv;
-          //     const object = e.intersection?.object;
-
-          //     _event.type = "mousedown";
-          //     _event.data.set(uv.x, 1 - uv.y);
-
-          //     const clientX = uv.x * window.innerWidth;
-          //     const clientY = uv.y * window.innerHeight;
-
-          //     object.dispatchEvent(
-          //       new PointerEvent("pointerdown", { clientX, clientY })
-          //     );
-          //   }}
-          //   onSelectEnd={(e) => {
-          //     console.log("onSelectEnd", e);
-
-          //     dragging.current = false;
-
-          //     if (!e.intersection?.uv) return;
-
-          //     const uv = e.intersection?.uv;
-          //     const object = e.intersection?.object;
-
-          //     // _event.type = "mouseup";
-          //     // _event.data.set(uv.x, 1 - uv.y);
-          //     // object.dispatchEvent(_event);
-
-          //     const clientX = uv.x * window.innerWidth;
-          //     const clientY = uv.y * window.innerHeight;
-          //     object.dispatchEvent(
-          //       new PointerEvent("pointerup", { clientX, clientY })
-          //     );
-          //   }}
-          //   onMove={(e) => {
-          //     if (dragging.current !== true) return; // skip if not dragging
-          //     console.log("onMove", e);
-
-          //     if (!e.intersection?.uv) return;
-
-          //     const uv = e.intersection?.uv;
-          //     const object = e.intersection?.object;
-
-          //     // _event.type = "mousemove";
-          //     // _event.data.set(uv.x, 1 - uv.y);
-          //     // object.dispatchEvent(_event);
-
-          //     const clientX = uv.x * window.innerWidth;
-          //     const clientY = uv.y * window.innerHeight;
-          //     console.log(clientX, clientY);
-          //     object.dispatchEvent(
-          //       new PointerEvent("pointermove", { clientX, clientY })
-          //     );
-          //   }}
-          // >
           <mesh
             ref={ref}
             castShadow
@@ -726,20 +850,13 @@ const Panel = forwardRef<
             {...(bind() as any)}
           >
             <primitive object={roundedPlaneGeometry} />
-            {children || (
-              <meshStandardMaterial
-                transparent
-                opacity={1}
-                color="white"
-                shadowSide={THREE.DoubleSide}
-              />
-            )}
+            {/* <primitive object={planeGeometry} /> */}
+            {children}
           </mesh>
-          // </Interactive>
         )}
 
         {debug && (
-          <Box args={size} {...posRot} {...props}>
+          <Box args={size} {...posRot}>
             <meshStandardMaterial wireframe color="#aaa" />
           </Box>
         )}
@@ -747,6 +864,253 @@ const Panel = forwardRef<
     );
   }
 );
+
+// ███████  ██████ ██████  ███████ ███████ ███    ██
+// ██      ██      ██   ██ ██      ██      ████   ██
+// ███████ ██      ██████  █████   █████   ██ ██  ██
+//      ██ ██      ██   ██ ██      ██      ██  ██ ██
+// ███████  ██████ ██   ██ ███████ ███████ ██   ████
+
+function Spinner({
+  Shape = Box,
+  color = "hotpink",
+}: {
+  Shape?: typeof Box | typeof Sphere;
+  color?: ComponentProps<"meshStandardMaterial">["color"];
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.rotation.z += 0.1;
+    }
+  });
+
+  const a = 0.2;
+
+  return (
+    <Shape args={Shape === Box ? [a, a, 0.01] : [a / 2, 8, 8]} ref={meshRef}>
+      <meshStandardMaterial color={color} wireframe />
+    </Shape>
+  );
+}
+
+function Screen({
+  media,
+  aspect,
+  quality = "best",
+  best = "video",
+  start = false,
+  spinner = true,
+  ...props
+}: {
+  media?: Media;
+  aspect?: number;
+  quality?: "degraded" | "best";
+  best?: keyof Media; // "image" | "video" | "color";
+  start?: boolean;
+  spinner?: boolean;
+} & ComponentProps<"meshStandardMaterial">) {
+  // console.log("Screen");
+
+  //
+  // Best in class `mode`
+  //
+  // 1. by default, mode has the `best` prop value (eg: "video")
+  // 2. but if quality is "degraded", mode degrades to "color" (or higher values, if already loaded)
+  //
+
+  let mode = best; // 1.
+  if (media) {
+    if (quality === "degraded") {
+      const imageLoaded = !!peek([media.image]);
+      const videoLoaded = !!peek([media.video]);
+      mode = videoLoaded ? "video" : imageLoaded ? "image" : "color"; // 2.
+    }
+  } else {
+    mode = "color";
+  }
+
+  const commonProps = { side: THREE.DoubleSide, ...props };
+  const imageVideoProps = { aspect };
+
+  //
+  // color < image < video (nested)
+  //
+
+  const color = (
+    <ColorMaterial color={media?.color ?? "gray"} {...commonProps} />
+  );
+  const image = (
+    <Suspense
+      fallback={
+        <>
+          {spinner && <Spinner color="orange" />}
+          {color}
+        </>
+      }
+    >
+      {media && (
+        <ImageMaterial
+          src={media.image}
+          {...commonProps}
+          {...imageVideoProps}
+        />
+      )}
+    </Suspense>
+  );
+  const video = (
+    <Suspense
+      fallback={
+        <>
+          {spinner && <Spinner color="red" />}
+          {image}
+        </>
+      }
+    >
+      {media && (
+        <VideoMaterial
+          src={media.video}
+          {...commonProps}
+          {...imageVideoProps}
+          videoTextureProps={{
+            start,
+            preload: "metadata",
+            unsuspend: "canplay",
+          }}
+        />
+      )}
+    </Suspense>
+  );
+
+  return {
+    color,
+    image,
+    video,
+  }[mode];
+}
+
+function ColorMaterial({
+  color,
+  ...props
+}: ComponentProps<"meshStandardMaterial">) {
+  return <meshStandardMaterial color={color} {...props} />;
+}
+
+const useImageTexture = (src: string) => {
+  const texture = suspend(
+    () =>
+      new Promise((resolve, reject) => {
+        new THREE.TextureLoader().load(
+          src,
+          (texture) => setTimeout(() => resolve(texture), 0),
+          undefined,
+          reject
+        );
+      }),
+    [src]
+  ) as THREE.Texture;
+
+  return texture;
+};
+
+function ImageMaterial({
+  src,
+  aspect,
+  size = "cover",
+  ...props
+}: {
+  src: string;
+  aspect?: number;
+  size?: "cover" | "contain";
+} & ComponentProps<"meshStandardMaterial">) {
+  // console.log("ImageMaterial", src);
+
+  const imageTexture = useImageTexture(src);
+
+  const image = imageTexture.image as HTMLImageElement;
+
+  useEffect(() => {
+    return () => void imageTexture.dispose();
+  }, [imageTexture]);
+
+  useEffect(() => {
+    if (image && aspect) {
+      const r = image.naturalWidth / image.naturalHeight;
+      const R = aspect;
+
+      const { repeat, offset } = objectFit(r, R, size);
+      imageTexture.repeat.copy(repeat);
+      imageTexture.offset.copy(offset);
+    }
+  }, [aspect, size, image, imageTexture]);
+
+  return <meshStandardMaterial map={imageTexture} {...props} />;
+}
+
+function VideoMaterial({
+  src,
+  videoTextureProps: {
+    start = false,
+    // unsuspend = "canplay",
+    ...videoTextureProps
+  } = {},
+  aspect,
+  size = "cover",
+  ...props
+}: {
+  src: Parameters<typeof useVideoTexture>[0];
+  videoTextureProps?: Parameters<typeof useVideoTexture>[1];
+  aspect?: number;
+  size?: "cover" | "contain";
+} & ComponentProps<"meshStandardMaterial">) {
+  // console.log("VideoMaterial", src);
+
+  const videoTexture = useVideoTexture(src, {
+    start,
+    // unsuspend,
+    onloadedmetadata(e) {
+      // console.log("onloadedmetadata", e);
+
+      const video = e.target as HTMLVideoElement;
+      if (!video) return;
+
+      video.currentTime = 30;
+    },
+    ...videoTextureProps,
+  });
+
+  useEffect(() => {
+    return () => void videoTexture.dispose();
+  }, [videoTexture]);
+
+  const video = videoTexture.image as HTMLVideoElement;
+
+  useEffect(() => {
+    // console.log("useEffect1");
+    if (video) {
+      if (start) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    }
+  }, [start, video]);
+
+  useEffect(() => {
+    // console.log("useEffect2");
+    if (video && aspect) {
+      const r = video.videoWidth / video.videoHeight;
+      const R = aspect;
+
+      const { repeat, offset } = objectFit(r, R, size);
+      videoTexture.repeat.copy(repeat);
+      videoTexture.offset.copy(offset);
+    }
+  }, [aspect, size, videoTexture, video]);
+
+  return <meshStandardMaterial map={videoTexture} {...props} />;
+}
 
 // ███████ ███████ ███████ ██   ██ ███████ ██████
 // ██      ██      ██      ██  ██  ██      ██   ██
