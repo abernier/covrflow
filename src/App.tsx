@@ -21,11 +21,14 @@ import {
   useXREvent,
 } from "@react-three/xr";
 import gsap from "gsap";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import Layout from "./Layout";
 import { Covrflow } from "./components/Covrflow";
 import { Leva, buttonGroup, useControls } from "leva";
 import { Mesh, Object3D } from "three";
+
+const queryClient = new QueryClient();
 
 function App() {
   const gui = useControls({
@@ -53,7 +56,9 @@ function App() {
 
           {/* <Physics gravity={[0, -60, 0]}> */}
           <Layout>
-            <Scene />
+            <QueryClientProvider client={queryClient}>
+              <Scene />
+            </QueryClientProvider>
           </Layout>
           {/* </Physics> */}
         </XR>

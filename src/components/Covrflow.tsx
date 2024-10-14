@@ -34,6 +34,9 @@ import merge from "deepmerge";
 import { invalidate, useFrame } from "@react-three/fiber";
 import * as geometry from "maath/geometry";
 import { suspend, peek } from "suspend-react";
+import { useQuery } from "@tanstack/react-query";
+
+import type { Videos } from "pexels";
 
 gsap.registerPlugin(InertiaPlugin);
 
@@ -233,12 +236,18 @@ const films = [
   // "05.mp4",
 ];
 
-const medias = Array.from({ length: 100 }).map((_, i) => ({
-  color: kulers[i % kulers.length],
-  image: `https://picsum.photos/450/800?random=${i}`,
-  video: films[i % films.length],
-}));
-console.log("medias=", medias);
+// const medias = Array.from({ length: 100 }).map((_, i) => ({
+//   color: kulers[i % kulers.length],
+//   image: `https://picsum.photos/450/800?random=${i}`,
+//   video: films[i % films.length],
+// }));
+// console.log("medias=", medias);
+
+type Media = {
+  color: string;
+  image: string;
+  video: string;
+};
 
 const r = 5;
 const TRANSLUCENCY = 0;
@@ -549,6 +558,32 @@ function Panels() {
     options,
   } = useCovrflow();
 
+  const query = "glamour";
+  const perPage = 20;
+  const page = Math.ceil(Math.abs(pos) / perPage);
+  console.log("page=", page);
+  const { data: medias } = useQuery<Media[]>({
+    queryKey: [query, page, perPage],
+    queryFn: async () => {
+      const response = await fetch(
+        `https://api.pexels.com/videos/search?query=${query}&orientation=portrait&size=small&per_page=${perPage}&page=${page}`,
+        {
+          headers: {
+            Authorization: import.meta.env.VITE_PEXELS_API_KEY,
+          },
+        }
+      );
+      const json: Videos = await response.json();
+
+      return json.videos.map((v) => ({
+        color: "gray",
+        image: v.video_pictures.find((p) => p.nr === 0)!.picture,
+        video: v.video_files[0].link,
+      }));
+    },
+  });
+  // console.log("medias=", medias);
+
   // sync timeline with pos
   useEffect(() => {
     const t = mod(pos); // [0..1]
@@ -706,12 +741,12 @@ function Panels() {
   const posFloored = Math.floor(pos);
   const fourMedias = useMemo(() => {
     return [
-      circ(medias, posFloored + 2), // backleft
-      circ(medias, posFloored + 1), // left
-      circ(medias, posFloored + 0), // front
-      circ(medias, posFloored - 1), // right
+      medias && circ(medias, posFloored + 2), // backleft
+      medias && circ(medias, posFloored + 1), // left
+      medias && circ(medias, posFloored + 0), // front
+      medias && circ(medias, posFloored - 1), // right
     ];
-  }, [posFloored]);
+  }, [medias, posFloored]);
 
   //
   // dynamic quality (based on smoothed velocity)
@@ -776,7 +811,7 @@ function Panels() {
             media={fourMedias[1]}
             aspect={aspect}
             quality={quality}
-            // start={centralVideo === "left" && slowEnough}
+            start={centralVideo === "left" && slowEnough}
           />
         </Panel>
         <Panel ref={panel3Ref} state="front" size={size}>
@@ -784,7 +819,7 @@ function Panels() {
             media={fourMedias[2]}
             aspect={aspect}
             quality={quality}
-            // start={centralVideo === "front" && slowEnough}
+            start={centralVideo === "front" && slowEnough}
           />
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>
@@ -921,10 +956,10 @@ function Screen({
   spinner = true,
   ...props
 }: {
-  media: (typeof medias)[number];
+  media?: Media;
   aspect?: number;
   quality?: "degraded" | "best";
-  best?: keyof typeof media; // "image" | "video" | "color";
+  best?: keyof NonNullable<typeof media>; // "image" | "video" | "color";
   start?: boolean;
   spinner?: boolean;
 } & ComponentProps<"meshStandardMaterial">) {
@@ -938,10 +973,14 @@ function Screen({
   //
 
   let mode = best; // 1.
-  if (quality === "degraded") {
-    const imageLoaded = peek([media.image]);
-    const videoLoaded = peek([media.video]);
-    mode = videoLoaded ? "video" : imageLoaded ? "image" : "color"; // 2.
+  if (media) {
+    if (quality === "degraded") {
+      const imageLoaded = !!peek([media.image]);
+      const videoLoaded = !!peek([media.video]);
+      mode = videoLoaded ? "video" : imageLoaded ? "image" : "color"; // 2.
+    }
+  } else {
+    mode = "color";
   }
 
   const commonProps = { side: THREE.DoubleSide, ...props };
@@ -951,7 +990,9 @@ function Screen({
   // color < image < video (nested)
   //
 
-  const color = <ColorMaterial color={media.color} {...commonProps} />;
+  const color = (
+    <ColorMaterial color={media?.color ?? "gray"} {...commonProps} />
+  );
   const image = (
     <Suspense
       fallback={
@@ -961,7 +1002,13 @@ function Screen({
         </>
       }
     >
-      <ImageMaterial src={media.image} {...commonProps} {...imageVideoProps} />
+      {media && (
+        <ImageMaterial
+          src={media.image}
+          {...commonProps}
+          {...imageVideoProps}
+        />
+      )}
     </Suspense>
   );
   const video = (
@@ -973,16 +1020,18 @@ function Screen({
         </>
       }
     >
-      <VideoMaterial
-        src={media.video}
-        {...commonProps}
-        {...imageVideoProps}
-        videoTextureProps={{
-          start,
-          preload: "metadata",
-          unsuspend: "loadedmetadata",
-        }}
-      />
+      {media && (
+        <VideoMaterial
+          src={media.video}
+          {...commonProps}
+          {...imageVideoProps}
+          videoTextureProps={{
+            start,
+            preload: "metadata",
+            unsuspend: "canplay",
+          }}
+        />
+      )}
     </Suspense>
   );
 
