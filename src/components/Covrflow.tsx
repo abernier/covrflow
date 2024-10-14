@@ -15,6 +15,7 @@ import {
   SetStateAction,
   useEffect,
   Suspense,
+  ReactNode,
 } from "react";
 import { Box, Sphere, Text, useVideoTexture } from "@react-three/drei";
 
@@ -243,11 +244,12 @@ const films = [
 // }));
 // console.log("medias=", medias);
 
-type Media = {
+export type Media = {
   color: string;
   image: string;
   video: string;
 };
+export type Medias = Media[];
 
 const r = 5;
 const TRANSLUCENCY = 0;
@@ -309,13 +311,16 @@ type Options = typeof defaultOptions;
 export const Covrflow = forwardRef<
   ElementRef<typeof CovrflowProvider>,
   {
+    children: ReactNode;
+    medias?: Medias;
     options?: Options;
   } & ComponentProps<"group">
->(({ options, ...props }, ref) => {
+>(({ children, medias, options, ...props }, ref) => {
   return (
     <group {...props}>
-      <CovrflowProvider ref={ref} options={options}>
+      <CovrflowProvider ref={ref} medias={medias} options={options}>
         <Panels />
+        {children}
       </CovrflowProvider>
     </group>
   );
@@ -350,18 +355,21 @@ type Api = {
     damping?: boolean
   ) => void;
 
+  medias?: Medias;
   options: Options;
 };
 
 const [useCovrflow, Provider] = createRequiredContext<Api>();
+export { useCovrflow };
 
 export const CovrflowProvider = forwardRef<
   Api,
   {
     children: React.ReactNode;
     options?: Partial<Options>;
+    medias?: Medias;
   }
->(({ children, options = {} }, ref) => {
+>(({ children, medias, options = {} }, ref) => {
   // console.log("CovrflowProvider");
 
   const opts = merge(defaultOptions, options, {
@@ -460,9 +468,10 @@ export const CovrflowProvider = forwardRef<
       go,
       damp,
 
+      medias,
       options: opts,
     }),
-    [pos, dragging, go, damp, opts]
+    [pos, dragging, go, damp, medias, opts]
   ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
@@ -556,32 +565,9 @@ function Panels() {
     draggingState: [dragging],
     trackerRef,
     options,
+    medias,
   } = useCovrflow();
 
-  const query = "glamour";
-  const perPage = 20;
-  const page = Math.ceil(Math.abs(pos) / perPage);
-  console.log("page=", page);
-  const { data: medias } = useQuery<Media[]>({
-    queryKey: [query, page, perPage],
-    queryFn: async () => {
-      const response = await fetch(
-        `https://api.pexels.com/videos/search?query=${query}&orientation=portrait&size=small&per_page=${perPage}&page=${page}`,
-        {
-          headers: {
-            Authorization: import.meta.env.VITE_PEXELS_API_KEY,
-          },
-        }
-      );
-      const json: Videos = await response.json();
-
-      return json.videos.map((v) => ({
-        color: "gray",
-        image: v.video_pictures.find((p) => p.nr === 0)!.picture,
-        video: v.video_files[0].link,
-      }));
-    },
-  });
   // console.log("medias=", medias);
 
   // sync timeline with pos

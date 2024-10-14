@@ -1,5 +1,6 @@
 import {
   ComponentProps,
+  Dispatch,
   ElementRef,
   SetStateAction,
   useCallback,
@@ -21,12 +22,17 @@ import {
   useXREvent,
 } from "@react-three/xr";
 import gsap from "gsap";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
 
 import Layout from "./Layout";
-import { Covrflow } from "./components/Covrflow";
+import { Covrflow, Media, useCovrflow } from "./components/Covrflow";
 import { Leva, buttonGroup, useControls } from "leva";
 import { Mesh, Object3D } from "three";
+import { type Videos } from "pexels";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +90,7 @@ function Scene() {
   // });
 
   const [gui, setGui] = useControls(() => ({
+    query: "romance",
     pos: {
       value: 0,
       disabled: true,
@@ -175,6 +182,8 @@ function Scene() {
   //   console.log("squeeze", e);
   // });
 
+  const [medias, setMedias] = useState<Media[]>();
+
   return (
     <>
       <Covrflow
@@ -184,9 +193,53 @@ function Scene() {
           duration: gui.duration,
           debug: gui.debug,
         }}
-      />
+        medias={medias}
+      >
+        <Medias query={gui.query} set={setMedias} />
+      </Covrflow>
 
       {/* <Box ref={boxRef} args={[6, 6, 6]} /> */}
     </>
   );
+}
+
+function Medias({
+  query,
+  set,
+}: {
+  query: string;
+  set: Dispatch<SetStateAction<Media[] | undefined>>;
+}) {
+  const {
+    posState: [pos],
+  } = useCovrflow();
+
+  const perPage = 20;
+  const page = Math.ceil(Math.abs(pos) / perPage);
+  console.log("page=", page);
+
+  const { data } = useQuery({
+    queryKey: [query, perPage, page],
+    queryFn: async () => {
+      const response = await fetch(
+        `https://api.pexels.com/videos/search?query=${query}&orientation=portrait&size=small&per_page=${perPage}&page=${page}`,
+        {
+          headers: {
+            Authorization: import.meta.env.VITE_PEXELS_API_KEY,
+          },
+        }
+      );
+      const json: Videos = await response.json();
+
+      return json.videos.map((v) => ({
+        color: "gray",
+        image: v.video_pictures.find((p) => p.nr === 0)!.picture,
+        video: v.video_files[0].link,
+      }));
+    },
+  });
+
+  set(data);
+
+  return null;
 }
