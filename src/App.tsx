@@ -124,6 +124,7 @@ function Scene() {
       max: 2,
     },
     debug: false,
+    isFetching: { value: false, disabled: true },
     pexels: folder(
       {
         query: "romance",
@@ -215,7 +216,8 @@ function Scene() {
       >
         <Medias
           query={gui.query}
-          set={setMedias}
+          setMedias={setMedias}
+          setIsFetching={(isFetching) => setGui({ isFetching })}
           options={{
             size: gui.size,
             orientation: gui.orientation,
@@ -231,7 +233,8 @@ function Scene() {
 
 function Medias({
   query,
-  set,
+  setMedias,
+  setIsFetching,
   options = {
     size: "small",
     perPage: 10,
@@ -239,7 +242,8 @@ function Medias({
   },
 }: {
   query: string;
-  set: (data: Media[]) => void;
+  setMedias: (data: Media[]) => void;
+  setIsFetching: (value: boolean) => void;
   options?: {
     size?: "small" | "medium" | "large";
     orientation?: "portrait" | "landscape" | "square";
@@ -271,7 +275,7 @@ function Medias({
     }));
   };
 
-  const { data, fetchNextPage } = useInfiniteQuery({
+  const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: [
       "medias",
       query,
@@ -286,6 +290,10 @@ function Medias({
   });
 
   useEffect(() => {
+    setIsFetching(isFetching);
+  }, [isFetching, setIsFetching]);
+
+  useEffect(() => {
     // console.log("page=", page);
     if (!data?.pageParams.includes(page)) {
       fetchNextPage();
@@ -297,9 +305,9 @@ function Medias({
       // console.log("data=", data);
       const medias = data.pages.flat();
 
-      set(medias);
+      setMedias(medias);
     }
-  }, [data, set]);
+  }, [data, setMedias]);
 
   return null;
 }
