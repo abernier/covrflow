@@ -39,6 +39,7 @@ jobs:
         env:
           USERNAME: ${{ github.repository_owner }}
           REPONAME: ${{ github.event.repository.name }}
+          VITE_PEXELS_API_KEY: ${{ secrets.VITE_PEXELS_API_KEY }}
       - uses: actions/upload-pages-artifact@v1
         with:
           path: ./dist
