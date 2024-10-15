@@ -239,6 +239,7 @@ function Medias({
     size: "small",
     perPage: 10,
     orientation: "portrait",
+    scanlines: 500,
   },
 }: {
   query: string;
@@ -248,6 +249,7 @@ function Medias({
     size?: "small" | "medium" | "large";
     orientation?: "portrait" | "landscape" | "square";
     perPage: number;
+    scanlines: number;
   };
 }) {
   const {
@@ -268,11 +270,27 @@ function Medias({
     );
     const json: Videos = await response.json();
 
-    return json.videos.map(({ video_pictures, video_files }) => ({
-      color: "gray",
-      image: video_pictures.find(({ nr }) => nr === 0)!.picture,
-      video: video_files[0].link,
-    }));
+    return json.videos.map(({ video_pictures, video_files }) => {
+      //
+      // Closest video to `options.scanlines`
+      //
+      const video_file = video_files.reduce((closest, file) => {
+        if (file.height === null) return closest;
+        if (closest.height === null) return file;
+
+        const delta =
+          Math.abs(file.height - options.scanlines) -
+          Math.abs(closest.height - options.scanlines);
+
+        return delta < 0 ? file : closest;
+      });
+
+      return {
+        color: "gray",
+        image: video_pictures.find(({ nr }) => nr === 0)!.picture,
+        video: video_file.link,
+      };
+    });
   };
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
