@@ -712,8 +712,9 @@ function Panels() {
 
   const [add] = useSmoothValue(100);
 
-  const [quality, setQuality] =
-    useState<ComponentProps<typeof Screen>["quality"]>("best-in-class");
+  const [quality, setQuality] = useState<
+    ComponentProps<typeof Screen>["quality"]
+  >("best-in-loaded-class");
   useFrame(() => {
     let velocity = trackerRef.current.get("current");
     // console.log("velocity=", velocity);
@@ -727,8 +728,8 @@ function Panels() {
     const v = Math.abs(smoothedVelocity);
     const motionless = v === 0;
 
-    const q = motionless && !dragging ? undefined : "best-in-class"; // undefined means "auto", ie: as `mode` is requesting
-    console.log("quality", q);
+    const q = motionless && !dragging ? undefined : "best-in-loaded-class"; // undefined means "auto", ie: as `mode` is requesting
+    // console.log("quality", q);
     setQuality(q);
   });
 
@@ -917,7 +918,7 @@ function Screen({
 }: {
   media?: Media;
   aspect?: number;
-  quality?: "best-in-class";
+  quality?: "best-in-loaded-class";
   mode?: keyof Media; // "image" | "video" | "color";
   start?: boolean;
   spinner?: boolean;
@@ -930,12 +931,12 @@ function Screen({
   // Best in class `mode`
   //
   // 1. by default, mode is as requested ("video" or "image" or "color")
-  // 2. but if quality is "best-in-class", mode degrades to "color" (or higher values, if already loaded)
+  // 2. but if quality is "best-in-loaded-class", mode degrades to "color" (or higher values, if already loaded)
   //
 
   let _mode = options.mode ?? mode; // 1. `_mode` is set "as requested" (by default)
   if (media) {
-    if (quality === "best-in-class") {
+    if (quality === "best-in-loaded-class") {
       const imageLoaded = !!peek([media.image]);
       const videoLoaded = !!peek([media.video]);
 
