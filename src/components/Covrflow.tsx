@@ -1077,11 +1077,7 @@ function ImageMaterial({
 
 function VideoMaterial({
   src,
-  videoTextureProps: {
-    start = false,
-    // unsuspend = "canplay",
-    ...videoTextureProps
-  } = {},
+  videoTextureProps: { start = false, ...videoTextureProps } = {},
   aspect,
   size = "cover",
   ...props
@@ -1094,16 +1090,11 @@ function VideoMaterial({
   // console.log("VideoMaterial", src);
 
   const videoTexture = useVideoTexture(src, {
-    start,
-    // unsuspend,
-    onloadedmetadata(e) {
-      // console.log("onloadedmetadata", e);
-
-      const video = e.target as HTMLVideoElement;
-      if (!video) return;
-
-      video.currentTime = 30;
-    },
+    // start,
+    // onloadedmetadata(e) {
+    //   const video = e.target as HTMLVideoElement;
+    //   if (!video) return;
+    // },
     ...videoTextureProps,
   });
 
@@ -1114,13 +1105,13 @@ function VideoMaterial({
   const video = videoTexture.image as HTMLVideoElement;
 
   useEffect(() => {
-    // console.log("useEffect1");
-    if (video) {
-      if (start) {
-        video.play();
-      } else {
-        video.pause();
-      }
+    // console.log("useEffect1", start, video);
+    if (!video) return;
+
+    if (start) {
+      video.play();
+    } else {
+      video.pause();
     }
   }, [start, video]);
 
