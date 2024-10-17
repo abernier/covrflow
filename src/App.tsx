@@ -102,7 +102,7 @@ function Scene() {
       value: 0,
       min: -30,
       max: 30,
-      step: 1,
+      step: 0.1,
       disabled: true,
     },
     nav: buttonGroup({
@@ -123,8 +123,18 @@ function Scene() {
       min: 0.01,
       max: 2,
     },
+    mode: {
+      value: "video" as const,
+      options: ["color", "image", "video"] as const,
+    },
+    start: true,
+    startIfVelocityLowerThan: {
+      value: 5,
+      min: 0,
+      max: 10,
+      step: 0.1,
+    },
     debug: false,
-    isFetching: { value: false, disabled: true },
     pexels: folder(
       {
         query: "romance",
@@ -140,6 +150,7 @@ function Scene() {
       },
       { collapsed: true }
     ),
+    isFetching: { value: false, disabled: true },
   }));
 
   // sync coverflow `pos` to GUI
@@ -210,6 +221,9 @@ function Scene() {
         options={{
           sensitivity: gui.sensitivity,
           duration: gui.duration,
+          start: gui.start,
+          startIfVelocityLowerThan: gui.startIfVelocityLowerThan,
+          mode: gui.mode,
           debug: gui.debug,
         }}
         medias={medias}
@@ -235,12 +249,12 @@ function Medias({
   query,
   setMedias,
   setIsFetching,
-  options = {
-    size: "small",
-    perPage: 10,
-    orientation: "portrait",
-    scanlines: 500,
-  },
+  options: {
+    size = "small",
+    perPage = 10,
+    orientation = "portrait",
+    scanlines = 500,
+  } = {},
 }: {
   query: string;
   setMedias: (data: Media[]) => void;
@@ -248,20 +262,20 @@ function Medias({
   options?: {
     size?: "small" | "medium" | "large";
     orientation?: "portrait" | "landscape" | "square";
-    perPage: number;
-    scanlines: number;
+    perPage?: number;
+    scanlines?: number;
   };
 }) {
   const {
     posState: [pos],
   } = useCovrflow();
 
-  const page = Math.ceil(Math.abs(pos) / options.perPage + 0.0001);
+  const page = Math.ceil(Math.abs(pos) / perPage + 0.0001);
   // console.log("page=", page);
 
   const fetchMedias = async ({ pageParam }: { pageParam: number }) => {
     const response = await fetch(
-      `https://api.pexels.com/videos/search?query=${query}&orientation=${options.orientation}&size=${options.size}&per_page=${options.perPage}&page=${pageParam}`,
+      `https://api.pexels.com/videos/search?query=${query}&orientation=${orientation}&size=${size}&per_page=${perPage}&page=${pageParam}`,
       {
         headers: {
           Authorization: VITE_PEXELS_API_KEY,
@@ -279,8 +293,8 @@ function Medias({
         if (closest.height === null) return file;
 
         const delta =
-          Math.abs(file.height - options.scanlines) -
-          Math.abs(closest.height - options.scanlines);
+          Math.abs(file.height - scanlines) -
+          Math.abs(closest.height - scanlines);
 
         return delta < 0 ? file : closest;
       });
@@ -294,13 +308,7 @@ function Medias({
   };
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
-    queryKey: [
-      "medias",
-      query,
-      options.perPage,
-      options.size,
-      options.orientation,
-    ],
+    queryKey: ["medias", query, perPage, size, orientation],
     queryFn: fetchMedias,
     initialPageParam: page,
     // placeholderData: keepPreviousData,

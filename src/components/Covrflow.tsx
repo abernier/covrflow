@@ -263,10 +263,20 @@ const STATES = {
 
 const defaultOptions = {
   sensitivity: 1 / 200,
-  duration: [0.5, 1.5] as [number, number],
+  duration: [0.5, 1.5],
+  start: true,
+  startIfVelocityLowerThan: 1, // It won't start if velocity is greater than this value
+  mode: undefined,
   debug: false,
 };
-type Options = typeof defaultOptions;
+type Options = {
+  sensitivity: number;
+  duration: [number, number];
+  start?: boolean;
+  startIfVelocityLowerThan?: number;
+  mode?: keyof Media;
+  debug: boolean;
+};
 
 export const Covrflow = forwardRef<
   ElementRef<typeof CovrflowProvider>,
@@ -524,7 +534,7 @@ function Panels() {
     posState: [pos],
     draggingState: [dragging],
     trackerRef,
-    options,
+    options: { debug, start, startIfVelocityLowerThan },
     medias,
   } = useCovrflow();
 
@@ -703,13 +713,13 @@ function Panels() {
   const [add] = useSmoothValue(100);
 
   const [quality, setQuality] =
-    useState<ComponentProps<typeof Screen>["quality"]>("degraded");
+    useState<ComponentProps<typeof Screen>["quality"]>("best-in-class");
   useFrame(() => {
     let velocity = trackerRef.current.get("current");
     // console.log("velocity=", velocity);
     if (isNaN(velocity)) velocity = 0;
 
-    const smoothedVelocity = add(velocity + (dragging ? 0.1 : 0))(); // if dragging: never go 0 (even if still)! so when releasing, quality is not suddenly "best", but has to smooth to 0
+    const smoothedVelocity = add(velocity + (dragging ? 0.1 : 0))(); // if dragging: never go 0 (even if still)! so when releasing, quality is not suddenly "highest", but has to smooth to 0
     // console.log("smoothedVelocity", smoothedVelocity);
 
     // const v = Math.abs(velocity);
@@ -717,8 +727,8 @@ function Panels() {
     const v = Math.abs(smoothedVelocity);
     const motionless = v === 0;
 
-    const q = motionless && !dragging ? "best" : "degraded";
-    // console.log("quality", q);
+    const q = motionless && !dragging ? undefined : "best-in-class"; // undefined means "auto", ie: as `mode` is requesting
+    console.log("quality", q);
     setQuality(q);
   });
 
@@ -738,8 +748,9 @@ function Panels() {
   const aspect = 9 / 16;
   const size: [number, number, number] = [3, 3 / aspect, 0.1];
 
-  const SLOW_EMOUGH = 5; // won't start if greater
-  const slowEnough = Math.abs(trackerRef.current.get("current")) <= SLOW_EMOUGH;
+  const slowEnough =
+    Math.abs(trackerRef.current.get("current")) <=
+    (startIfVelocityLowerThan ?? Infinity);
 
   return (
     <>
@@ -759,7 +770,7 @@ function Panels() {
             media={fourMedias[1]}
             aspect={aspect}
             quality={quality}
-            start={centralVideo === "left" && slowEnough}
+            start={centralVideo === "left" && start && slowEnough}
           />
         </Panel>
         <Panel ref={panel3Ref} state="front" size={size}>
@@ -767,7 +778,7 @@ function Panels() {
             media={fourMedias[2]}
             aspect={aspect}
             quality={quality}
-            start={centralVideo === "front" && slowEnough}
+            start={centralVideo === "front" && start && slowEnough}
           />
         </Panel>
         <Panel ref={panel4Ref} state="right" size={size}>
@@ -783,7 +794,7 @@ function Panels() {
         <Panel state="backright" debugOnly size={size} />
       </group>
 
-      {options.debug && <Seeker />}
+      {debug && <Seeker />}
     </>
   );
 }
@@ -898,44 +909,59 @@ function Spinner({
 function Screen({
   media,
   aspect,
-  quality = "best",
-  best = "video",
+  quality = undefined,
+  mode = "video",
   start = false,
   spinner = true,
   ...props
 }: {
   media?: Media;
   aspect?: number;
-  quality?: "degraded" | "best";
-  best?: keyof Media; // "image" | "video" | "color";
+  quality?: "best-in-class";
+  mode?: keyof Media; // "image" | "video" | "color";
   start?: boolean;
   spinner?: boolean;
 } & ComponentProps<"meshStandardMaterial">) {
   // console.log("Screen");
 
+  const { options } = useCovrflow();
+
   //
   // Best in class `mode`
   //
-  // 1. by default, mode has the `best` prop value (eg: "video")
-  // 2. but if quality is "degraded", mode degrades to "color" (or higher values, if already loaded)
+  // 1. by default, mode is as requested ("video" or "image" or "color")
+  // 2. but if quality is "best-in-class", mode degrades to "color" (or higher values, if already loaded)
   //
 
-  let mode = best; // 1.
+  let _mode = options.mode ?? mode; // 1. `_mode` is set "as requested" (by default)
   if (media) {
-    if (quality === "degraded") {
+    if (quality === "best-in-class") {
       const imageLoaded = !!peek([media.image]);
       const videoLoaded = !!peek([media.video]);
-      mode = videoLoaded ? "video" : imageLoaded ? "image" : "color"; // 2.
+
+      switch (_mode) {
+        case "video":
+          _mode = videoLoaded ? "video" : imageLoaded ? "image" : "color"; // 2.
+          break;
+        case "image":
+          _mode = imageLoaded ? "image" : "color"; // 2.
+          break;
+        case "color":
+          _mode = "color";
+          break;
+      }
+    } else {
+      // undefined => leave as 1. (as requested: "video" or "image" or "color")
     }
   } else {
-    mode = "color";
+    _mode = "color";
   }
 
   const commonProps = { side: THREE.DoubleSide, ...props };
   const imageVideoProps = { aspect };
 
   //
-  // color < image < video (nested)
+  // color < image < video (cascade)
   //
 
   const color = (
@@ -987,7 +1013,7 @@ function Screen({
     color,
     image,
     video,
-  }[mode];
+  }[_mode];
 }
 
 function ColorMaterial({
