@@ -40,6 +40,12 @@ const queryClient = new QueryClient();
 
 const VITE_PEXELS_API_KEY: string = import.meta.env.VITE_PEXELS_API_KEY;
 
+//  █████  ██████  ██████
+// ██   ██ ██   ██ ██   ██
+// ███████ ██████  ██████
+// ██   ██ ██      ██
+// ██   ██ ██      ██
+
 function App() {
   const gui = useControls({
     onDemandFrameloop: { label: "onDemand", value: false },
@@ -81,6 +87,12 @@ export const Styled = styled.div`
   inset: 0;
 `;
 export default App;
+
+// ███████  ██████ ███████ ███    ██ ███████
+// ██      ██      ██      ████   ██ ██
+// ███████ ██      █████   ██ ██  ██ █████
+//      ██ ██      ██      ██  ██ ██ ██
+// ███████  ██████ ███████ ██   ████ ███████
 
 function Scene() {
   const covrflowRef = useRef<ElementRef<typeof Covrflow>>(null);
@@ -135,6 +147,14 @@ function Scene() {
       step: 0.1,
     },
     debug: false,
+    mediasOrigin: {
+      value: "https://api.pexels.com/videos/search" as const,
+      options: [
+        "https://api.pexels.com/videos/search",
+        "http://localhost:5173/api/medias",
+      ] as const,
+    },
+    isFetching: { value: false, disabled: true },
     pexels: folder(
       {
         query: "romance",
@@ -148,9 +168,12 @@ function Scene() {
           options: ["portrait", "landscape", "square"] as const,
         },
       },
-      { collapsed: true }
+      {
+        collapsed: true,
+        render: (get) =>
+          get("mediasOrigin") === "https://api.pexels.com/videos/search",
+      }
     ),
-    isFetching: { value: false, disabled: true },
   }));
 
   // sync coverflow `pos` to GUI
@@ -233,6 +256,7 @@ function Scene() {
           setMedias={setMedias}
           setIsFetching={(isFetching) => setGui({ isFetching })}
           options={{
+            origin: gui.mediasOrigin,
             size: gui.size,
             orientation: gui.orientation,
             perPage: gui.perPage,
@@ -245,6 +269,18 @@ function Scene() {
   );
 }
 
+// ███    ███ ███████ ██████  ██  █████  ███████
+// ████  ████ ██      ██   ██ ██ ██   ██ ██
+// ██ ████ ██ █████   ██   ██ ██ ███████ ███████
+// ██  ██  ██ ██      ██   ██ ██ ██   ██      ██
+// ██      ██ ███████ ██████  ██ ██   ██ ███████
+
+const origins = [
+  "https://api.pexels.com/videos/search",
+  "http://localhost:5173/api/medias",
+] as const;
+type Origins = (typeof origins)[number];
+
 function Medias({
   query,
   setMedias,
@@ -254,6 +290,7 @@ function Medias({
     perPage = 10,
     orientation = "portrait",
     scanlines = 500,
+    origin = origins[0],
   } = {},
 }: {
   query: string;
@@ -264,6 +301,7 @@ function Medias({
     orientation?: "portrait" | "landscape" | "square";
     perPage?: number;
     scanlines?: number;
+    origin?: Origins;
   };
 }) {
   const {
@@ -273,43 +311,41 @@ function Medias({
   const page = Math.ceil(Math.abs(pos) / perPage + 0.0001);
   // console.log("page=", page);
 
-  const fetchMedias = async ({ pageParam }: { pageParam: number }) => {
-    const response = await fetch(
-      `https://api.pexels.com/videos/search?query=${query}&orientation=${orientation}&size=${size}&per_page=${perPage}&page=${pageParam}`,
-      {
-        headers: {
-          Authorization: VITE_PEXELS_API_KEY,
-        },
-      }
-    );
-    const json: Videos = await response.json();
-
-    return json.videos.map(({ video_pictures, video_files }) => {
-      //
-      // Closest video to `options.scanlines`
-      //
-      const video_file = video_files.reduce((closest, file) => {
-        if (file.height === null) return closest;
-        if (closest.height === null) return file;
-
-        const delta =
-          Math.abs(file.height - scanlines) -
-          Math.abs(closest.height - scanlines);
-
-        return delta < 0 ? file : closest;
-      });
-
-      return {
-        color: "gray",
-        image: video_pictures.find(({ nr }) => nr === 0)!.picture,
-        video: video_file.link,
-      };
-    });
-  };
-
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
-    queryKey: ["medias", query, perPage, size, orientation],
-    queryFn: fetchMedias,
+    queryKey: ["medias", origin, query, perPage, size, orientation],
+    async queryFn({ pageParam }: { pageParam: number }) {
+      const response = await fetch(
+        `${origin}?query=${query}&orientation=${orientation}&size=${size}&per_page=${perPage}&page=${pageParam}`,
+        {
+          headers: {
+            Authorization: VITE_PEXELS_API_KEY,
+          },
+        }
+      );
+      const json: Videos = await response.json();
+
+      return json.videos.map(({ video_pictures, video_files }) => {
+        //
+        // Closest video to `options.scanlines`
+        //
+        const video_file = video_files.reduce((closest, file) => {
+          if (file.height === null) return closest;
+          if (closest.height === null) return file;
+
+          const delta =
+            Math.abs(file.height - scanlines) -
+            Math.abs(closest.height - scanlines);
+
+          return delta < 0 ? file : closest;
+        });
+
+        return {
+          color: "gray",
+          image: video_pictures.find(({ nr }) => nr === 0)!.picture,
+          video: video_file.link,
+        };
+      });
+    },
     initialPageParam: page,
     // placeholderData: keepPreviousData,
     getNextPageParam: () => page,
