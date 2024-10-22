@@ -258,33 +258,6 @@ const STATES = {
   },
 } satisfies Record<Statename, State>;
 
-function isChildOf(child: THREE.Object3D, parent: THREE.Object3D | null) {
-  let found = false;
-
-  parent?.traverse((object) => {
-    if (object === child) {
-      found = true;
-    }
-  });
-
-  return found;
-}
-function findClosestAncestor(
-  child: THREE.Object3D,
-  possibleAncestors: (THREE.Object3D | null)[]
-) {
-  let current: THREE.Object3D | null = child;
-
-  while (current !== null) {
-    if (possibleAncestors.includes(current)) {
-      return current; // Found the closest ancestor (including childMesh itself)
-    }
-    current = current.parent; // Move up the hierarchy
-  }
-
-  return null; // No matching ancestor found
-}
-
 //  ██████  ██████  ██    ██ ██████  ███████ ██       ██████  ██     ██
 // ██      ██    ██ ██    ██ ██   ██ ██      ██      ██    ██ ██     ██
 // ██      ██    ██ ██    ██ ██████  █████   ██      ██    ██ ██  █  ██
@@ -345,8 +318,6 @@ type Api = {
   tlPanels: MutableRefObject<gsap.core.Timeline>;
   panelsRefs: RefObject<ElementRef<"mesh">>[];
   seat: MutableRefObject<Seat>;
-
-  closestPanel: (obj: THREE.Object3D) => THREE.Object3D | null;
 
   inertiaValueRef: PosRef;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
@@ -461,16 +432,6 @@ export const CovrflowProvider = forwardRef<
   );
   const panelsRefs = panelsRefsRef.current;
 
-  // A utility function to find the closest (ancestor) panel, given an obj3d
-  const closestPanel = useCallback(
-    (obj: THREE.Object3D) =>
-      findClosestAncestor(
-        obj,
-        panelsRefs.map(({ current }) => current)
-      ),
-    [panelsRefs]
-  );
-
   // api
   const value = useMemo(
     () => ({
@@ -480,7 +441,6 @@ export const CovrflowProvider = forwardRef<
       draggingState: [dragging, setDragging],
 
       panelsRefs,
-      closestPanel,
       tlPanels,
       seat,
 
@@ -494,7 +454,7 @@ export const CovrflowProvider = forwardRef<
       medias,
       options: opts,
     }),
-    [pos, dragging, go, damp, medias, opts, panelsRefs, closestPanel]
+    [pos, dragging, go, damp, medias, opts, panelsRefs]
   ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
@@ -518,7 +478,6 @@ function useDrag({
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
 } = {}) {
   const {
-    closestPanel,
     inertiaValueRef,
     twInertia,
     posState: [, setPos],
@@ -536,8 +495,8 @@ function useDrag({
       setDragging(true);
 
       // Taking the seat if available
-      if (seat.current !== null) return; // if not available (previously taken) => skip
-      seat.current = closestPanel((event as CustomDragEvent).object); // take the seat with the event's closest panel
+      if (seat.current !== null) return; // if not => skip
+      seat.current = (event as CustomDragEvent).object;
 
       twInertia.current?.kill(); // Cancel previous inertia tween if still active
     },
@@ -560,7 +519,7 @@ function useDrag({
       // console.log("onDragEnd");
 
       // Releasing the seat on "dragend" (only for event "inside" the current seat)
-      if (!isChildOf((event as CustomDragEvent).object, seat.current)) return;
+      if (seat.current !== (event as CustomDragEvent).object) return;
 
       seat.current = null;
 
@@ -820,7 +779,7 @@ function Panels() {
               spinner={false}
             />
             {debug && (
-              <Text position-z=".01">
+              <Text position-z=".01" raycast={() => null}>
                 {fourMedias[i] && medias?.indexOf(fourMedias[i])}
               </Text>
             )}
