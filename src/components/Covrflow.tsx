@@ -549,7 +549,7 @@ function Panels() {
     posState: [pos],
     draggingState: [dragging],
     trackerRef,
-    options: { debug, start, startIfVelocityLowerThan },
+    options: { debug, startIfVelocityLowerThan },
     medias,
   } = useCovrflow();
 
@@ -911,7 +911,6 @@ function Screen({
   aspect,
   quality = undefined,
   mode = "video",
-  start = false,
   spinner = true,
   ...props
 }: {
@@ -919,7 +918,6 @@ function Screen({
   aspect?: number;
   quality?: "best-in-loaded-class";
   mode?: keyof Media; // "image" | "video" | "color";
-  start?: boolean;
   spinner?: boolean;
 } & ComponentProps<"meshStandardMaterial">) {
   // console.log("Screen");
@@ -1000,7 +998,7 @@ function Screen({
           {...commonProps}
           {...imageVideoProps}
           videoTextureProps={{
-            start,
+            start: options.start,
             preload: "metadata",
             unsuspend: "canplay",
           }}
@@ -1076,7 +1074,7 @@ function ImageMaterial({
 
 function VideoMaterial({
   src,
-  videoTextureProps: { start = false, ...videoTextureProps } = {},
+  videoTextureProps = {},
   aspect,
   size = "cover",
   ...props
@@ -1088,14 +1086,7 @@ function VideoMaterial({
 } & ComponentProps<"meshStandardMaterial">) {
   // console.log("VideoMaterial", src);
 
-  const videoTexture = useVideoTexture(src, {
-    // start,
-    // onloadedmetadata(e) {
-    //   const video = e.target as HTMLVideoElement;
-    //   if (!video) return;
-    // },
-    ...videoTextureProps,
-  });
+  const videoTexture = useVideoTexture(src, videoTextureProps);
 
   useEffect(() => {
     return () => void videoTexture.dispose();
@@ -1103,6 +1094,7 @@ function VideoMaterial({
 
   const video = videoTexture.image as HTMLVideoElement;
 
+  const { start } = videoTextureProps;
   useEffect(() => {
     // console.log("useEffect1", start, video);
     if (!video) return;
