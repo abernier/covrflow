@@ -16,8 +16,10 @@ import {
   useEffect,
   Suspense,
   ReactNode,
+  RefObject,
+  createRef,
 } from "react";
-import { Box, Sphere, useVideoTexture } from "@react-three/drei";
+import { Box, Sphere, useVideoTexture, Text } from "@react-three/drei";
 
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -213,6 +215,13 @@ export type Medias = Media[];
 
 const r = 5;
 const TRANSLUCENCY = 0;
+
+type Statename = "backleft" | "left" | "front" | "right" | "backright";
+type State = {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  opacity: number;
+};
 const STATES = {
   backleft: {
     position: [
@@ -247,13 +256,34 @@ const STATES = {
     rotation: [0, -Math.PI / 3, 0],
     opacity: TRANSLUCENCY,
   },
-} satisfies {
-  [k in "backleft" | "left" | "front" | "right" | "backright"]: {
-    position: [number, number, number];
-    rotation: [number, number, number];
-    opacity: number;
-  };
-};
+} satisfies Record<Statename, State>;
+
+function isChildOf(child: THREE.Object3D, parent: THREE.Object3D | null) {
+  let found = false;
+
+  parent?.traverse((object) => {
+    if (object === child) {
+      found = true;
+    }
+  });
+
+  return found;
+}
+function findClosestAncestor(
+  child: THREE.Object3D,
+  possibleAncestors: (THREE.Object3D | null)[]
+) {
+  let current: THREE.Object3D | null = child;
+
+  while (current !== null) {
+    if (possibleAncestors.includes(current)) {
+      return current; // Found the closest ancestor (including childMesh itself)
+    }
+    current = current.parent; // Move up the hierarchy
+  }
+
+  return null; // No matching ancestor found
+}
 
 //  ██████  ██████  ██    ██ ██████  ███████ ██       ██████  ██     ██
 // ██      ██    ██ ██    ██ ██   ██ ██      ██      ██    ██ ██     ██
@@ -304,7 +334,7 @@ export const Covrflow = forwardRef<
 
 type Pos = number;
 type PosRef = MutableRefObject<Pos>;
-type Seat = THREE.Mesh | null;
+type Seat = THREE.Object3D | null;
 
 type Api = {
   posState: [Pos, Dispatch<SetStateAction<Pos>>];
@@ -313,7 +343,10 @@ type Api = {
   draggingState: [boolean, Dispatch<SetStateAction<boolean>>];
 
   tlPanels: MutableRefObject<gsap.core.Timeline>;
+  panelsRefs: RefObject<ElementRef<"mesh">>[];
   seat: MutableRefObject<Seat>;
+
+  closestPanel: (obj: THREE.Object3D) => THREE.Object3D | null;
 
   inertiaValueRef: PosRef;
   twInertia: MutableRefObject<gsap.core.Tween | undefined>;
@@ -420,6 +453,24 @@ export const CovrflowProvider = forwardRef<
     [damp]
   );
 
+  // Panels refs
+  const panelsRefsRef = useRef(
+    Array.from({ length: Object.keys(STATES).length }).map(() =>
+      createRef<ElementRef<"mesh">>()
+    )
+  );
+  const panelsRefs = panelsRefsRef.current;
+
+  // A utility function to find the closest (ancestor) panel, given an obj3d
+  const closestPanel = useCallback(
+    (obj: THREE.Object3D) =>
+      findClosestAncestor(
+        obj,
+        panelsRefs.map(({ current }) => current)
+      ),
+    [panelsRefs]
+  );
+
   // api
   const value = useMemo(
     () => ({
@@ -428,6 +479,8 @@ export const CovrflowProvider = forwardRef<
 
       draggingState: [dragging, setDragging],
 
+      panelsRefs,
+      closestPanel,
       tlPanels,
       seat,
 
@@ -441,7 +494,7 @@ export const CovrflowProvider = forwardRef<
       medias,
       options: opts,
     }),
-    [pos, dragging, go, damp, medias, opts]
+    [pos, dragging, go, damp, medias, opts, panelsRefs, closestPanel]
   ) satisfies Api;
 
   useImperativeHandle(ref, () => value, [value]);
@@ -465,6 +518,7 @@ function useDrag({
   onDrag?: Parameters<typeof useGesture>[0]["onDrag"];
 } = {}) {
   const {
+    closestPanel,
     inertiaValueRef,
     twInertia,
     posState: [, setPos],
@@ -482,8 +536,8 @@ function useDrag({
       setDragging(true);
 
       // Taking the seat if available
-      if (seat.current !== null) return; // if not => skip
-      seat.current = (event as CustomDragEvent).object;
+      if (seat.current !== null) return; // if not available (previously taken) => skip
+      seat.current = closestPanel((event as CustomDragEvent).object); // take the seat with the event's closest panel
 
       twInertia.current?.kill(); // Cancel previous inertia tween if still active
     },
@@ -505,8 +559,9 @@ function useDrag({
     onDragEnd({ movement: [mx], event }) {
       // console.log("onDragEnd");
 
-      // Releasing the seat on "dragend"
-      if (seat.current !== (event as CustomDragEvent).object) return;
+      // Releasing the seat on "dragend" (only for event "inside" the current seat)
+      if (!isChildOf((event as CustomDragEvent).object, seat.current)) return;
+
       seat.current = null;
 
       // if (Math.abs(mx) <= 0) return; // prevent simple-click (without any movement)
@@ -531,6 +586,7 @@ function Panels() {
 
   const {
     tlPanels,
+    panelsRefs,
     posState: [pos],
     draggingState: [dragging],
     trackerRef,
@@ -550,10 +606,7 @@ function Panels() {
   // Tweens
   //
 
-  const panel1Ref = useRef<ElementRef<"mesh">>(null);
-  const panel2Ref = useRef<ElementRef<"mesh">>(null);
-  const panel3Ref = useRef<ElementRef<"mesh">>(null);
-  const panel4Ref = useRef<ElementRef<"mesh">>(null);
+  const [panel1Ref, panel2Ref, panel3Ref, panel4Ref] = panelsRefs;
 
   const { contextSafe } = useGSAP(() => {
     console.log("useGSAP");
@@ -756,41 +809,23 @@ function Panels() {
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
-        <Panel ref={panel1Ref} state="backleft" size={size}>
-          <Screen
-            media={fourMedias[0]}
-            aspect={aspect}
-            transparent
-            opacity={STATES.backleft.opacity}
-            quality={quality}
-            spinner={false}
-          />
-        </Panel>
-        <Panel ref={panel2Ref} state="left" size={size}>
-          <Screen
-            media={fourMedias[1]}
-            aspect={aspect}
-            quality={quality}
-            start={centralVideo === "left" && start && slowEnough}
-          />
-        </Panel>
-        <Panel ref={panel3Ref} state="front" size={size}>
-          <Screen
-            media={fourMedias[2]}
-            aspect={aspect}
-            quality={quality}
-            start={centralVideo === "front" && start && slowEnough}
-          />
-        </Panel>
-        <Panel ref={panel4Ref} state="right" size={size}>
-          <Screen
-            media={fourMedias[3]}
-            aspect={aspect}
-            transparent
-            opacity={STATES.right.opacity}
-            quality={quality}
-          />
-        </Panel>
+        {Object.entries(STATES).map(([state, { opacity }], i) => (
+          <Panel ref={panelsRefs[i]} state={state as Statename} size={size}>
+            <Screen
+              media={fourMedias[i]}
+              aspect={aspect}
+              transparent
+              opacity={opacity}
+              quality={quality}
+              spinner={false}
+            />
+            {debug && (
+              <Text position-z=".01">
+                {fourMedias[i] && medias?.indexOf(fourMedias[i])}
+              </Text>
+            )}
+          </Panel>
+        ))}
 
         <Panel state="backright" debugOnly size={size} />
       </group>
