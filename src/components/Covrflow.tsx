@@ -769,7 +769,12 @@ function Panels() {
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
         {Object.entries(STATES).map(([state, { opacity }], i) => (
-          <Panel ref={panelsRefs[i]} state={state as Statename} size={size}>
+          <Panel
+            key={state as Statename}
+            ref={panelsRefs[i]}
+            state={state as Statename}
+            size={size}
+          >
             <Screen
               media={fourMedias[i]}
               aspect={aspect}
