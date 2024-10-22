@@ -20,6 +20,7 @@ import {
   createRef,
 } from "react";
 import { Box, Sphere, useVideoTexture, Text } from "@react-three/drei";
+import type { Entries } from "type-fest";
 
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -768,30 +769,42 @@ function Panels() {
   return (
     <>
       <group position={[0, size[1] / 2 + size[1] * 0.002, 0]}>
-        {Object.entries(STATES).map(([state, { opacity }], i) => (
-          <Panel
-            key={state as Statename}
-            ref={panelsRefs[i]}
-            state={state as Statename}
-            size={size}
-          >
-            <Screen
-              media={fourMedias[i]}
-              aspect={aspect}
-              transparent
-              opacity={opacity}
-              quality={quality}
-              spinner={false}
-            />
-            {debug && (
-              <Text position-z=".01" raycast={() => null}>
-                {fourMedias[i] && medias?.indexOf(fourMedias[i])}
-              </Text>
-            )}
-          </Panel>
-        ))}
+        {(Object.entries(STATES) as Entries<typeof STATES>).map(
+          ([statename, { opacity }], i) => (
+            <Panel
+              key={statename}
+              ref={panelsRefs[i]}
+              statename={statename}
+              size={size}
+            >
+              <Screen
+                media={fourMedias[i]}
+                aspect={aspect}
+                transparent
+                opacity={opacity}
+                quality={quality}
+                spinner={
+                  statename === "backleft" || statename === "backright"
+                    ? false // no spinner for back panels
+                    : undefined
+                }
+                start={
+                  ((statename === "left" && centralVideo === "left") ||
+                    (statename === "front" && centralVideo === "front")) &&
+                  start &&
+                  slowEnough
+                }
+              />
+              {debug && (
+                <Text position-z=".01" raycast={() => null}>
+                  {fourMedias[i] && medias?.indexOf(fourMedias[i])}
+                </Text>
+              )}
+            </Panel>
+          )
+        )}
 
-        <Panel state="backright" debugOnly size={size} />
+        <Panel statename="backright" debugOnly size={size} />
       </group>
 
       {debug && <Seeker />}
@@ -808,7 +821,7 @@ function Panels() {
 const Panel = forwardRef<
   ElementRef<"mesh">,
   ComponentProps<"mesh"> & {
-    state: keyof typeof STATES;
+    statename: keyof typeof STATES;
     debug?: boolean;
     debugOnly?: boolean;
     size: [number, number, number];
@@ -817,7 +830,7 @@ const Panel = forwardRef<
 >(
   (
     {
-      state,
+      statename,
       children,
       debugOnly = false,
       size = [3, 5, 0.1],
@@ -833,8 +846,8 @@ const Panel = forwardRef<
     } = useCovrflow();
 
     const posRot = {
-      position: STATES[state].position,
-      rotation: STATES[state].rotation,
+      position: STATES[statename].position,
+      rotation: STATES[statename].rotation,
     };
 
     const { bind } = useDrag();
@@ -1076,7 +1089,7 @@ function ImageMaterial({
 
 function VideoMaterial({
   src,
-  videoTextureProps: { start = false, ...videoTextureProps } = {},
+  videoTextureProps = {},
   aspect,
   size = "cover",
   ...props
@@ -1088,14 +1101,7 @@ function VideoMaterial({
 } & ComponentProps<"meshStandardMaterial">) {
   // console.log("VideoMaterial", src);
 
-  const videoTexture = useVideoTexture(src, {
-    // start,
-    // onloadedmetadata(e) {
-    //   const video = e.target as HTMLVideoElement;
-    //   if (!video) return;
-    // },
-    ...videoTextureProps,
-  });
+  const videoTexture = useVideoTexture(src, videoTextureProps);
 
   useEffect(() => {
     return () => void videoTexture.dispose();
@@ -1103,6 +1109,7 @@ function VideoMaterial({
 
   const video = videoTexture.image as HTMLVideoElement;
 
+  const { start } = videoTextureProps;
   useEffect(() => {
     // console.log("useEffect1", start, video);
     if (!video) return;

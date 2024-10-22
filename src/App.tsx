@@ -305,7 +305,7 @@ function Medias({
   } = useCovrflow();
 
   const page = Math.ceil(Math.abs(pos) / perPage + 0.0001);
-  // console.log("page=", page);
+  console.log("page=", page);
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: ["medias", host, query, perPage, size, orientation],
