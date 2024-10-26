@@ -779,6 +779,11 @@ function Panels() {
               ref={panelsRefs[i]}
               statename={statename}
               size={size}
+              raycast={
+                statename === "backleft" || statename === "backright"
+                  ? () => null
+                  : undefined
+              }
             >
               <Screen
                 media={fourMedias[i]}
