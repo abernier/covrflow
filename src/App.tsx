@@ -35,6 +35,7 @@ import { Covrflow, Media, useCovrflow } from "./components/Covrflow";
 import { Leva, buttonGroup, folder, useControls } from "leva";
 import { Mesh, Object3D } from "three";
 import { type Videos } from "pexels";
+import { dir } from "console";
 
 //
 // Constants
@@ -154,7 +155,6 @@ function Scene() {
       step: 0.1,
     },
     debug: false,
-    isFetching: { value: false, disabled: true },
     pexels: folder(
       {
         host: {
@@ -163,6 +163,11 @@ function Scene() {
         },
         query: "romance",
         perPage: 10,
+        shortTail: {
+          value: 0,
+          min: 0,
+          step: 1,
+        },
         size: {
           value: "small" as const,
           options: ["small", "medium", "large"] as const,
@@ -237,7 +242,7 @@ function Scene() {
   //   console.log("squeeze", e);
   // });
 
-  const [medias, setMedias] = useState<Media[]>();
+  const [medias, setMedias] = useState<Media[]>([]);
 
   return (
     <>
@@ -256,12 +261,12 @@ function Scene() {
         <Medias
           query={gui.query}
           setMedias={setMedias}
-          setIsFetching={(isFetching) => setGui({ isFetching })}
           options={{
             host: gui.host as Host,
             size: gui.size,
             orientation: gui.orientation,
             perPage: gui.perPage,
+            shortTail: gui.shortTail,
           }}
         />
       </Covrflow>
@@ -280,32 +285,33 @@ function Scene() {
 function Medias({
   query,
   setMedias,
-  setIsFetching,
   options: {
     size = "small",
     perPage = 10,
     orientation = "portrait",
     scanlines = 500,
     host = hosts[0],
+    shortTail = 0,
   } = {},
 }: {
   query: string;
-  setMedias: (data: Media[]) => void;
-  setIsFetching: (value: boolean) => void;
+  setMedias: Dispatch<SetStateAction<Media[]>>;
   options?: {
     size?: "small" | "medium" | "large";
     orientation?: "portrait" | "landscape" | "square";
     perPage?: number;
     scanlines?: number;
     host?: Host;
+    shortTail?: number;
   };
 }) {
   const {
     posState: [pos],
+    go,
   } = useCovrflow();
 
   const page = Math.ceil(Math.abs(pos) / perPage + 0.0001);
-  console.log("page=", page);
+  // console.log("page=", page);
 
   const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: ["medias", host, query, perPage, size, orientation],
@@ -320,7 +326,11 @@ function Medias({
       );
       const json: Videos = await response.json();
 
-      return json.videos.map(({ video_pictures, video_files }) => {
+      //
+      // Create new medias from fetched videos
+      //
+
+      const newMedias = json.videos.map(({ video_pictures, video_files }) => {
         //
         // Closest video to `options.scanlines`
         //
@@ -341,31 +351,62 @@ function Medias({
           video: video_file.link,
         };
       });
+
+      return {
+        dir: pos >= 0 ? "append" : "prepend",
+        newMedias,
+      };
     },
     initialPageParam: page,
     // placeholderData: keepPreviousData,
-    getNextPageParam: () => page,
+    getNextPageParam: () => page + 1,
   });
 
+  // Reset to first when query changes
   useEffect(() => {
-    setIsFetching(isFetching);
-  }, [isFetching, setIsFetching]);
+    go(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [host, query, perPage, size, orientation]);
 
-  useEffect(() => {
-    // console.log("page=", page);
-    if (!data?.pageParams.includes(page)) {
-      fetchNextPage();
+  // Compute medias
+  const medias = useMemo(() => {
+    const res = [];
+
+    for (const page of data?.pages ?? []) {
+      if (page.dir === "append") {
+        res.push(...page.newMedias);
+      } else {
+        res.unshift(...page.newMedias);
+      }
     }
-  }, [data?.pageParams, fetchNextPage, page]);
+    // console.log("res=", res);
 
-  useEffect(() => {
-    if (data) {
-      // console.log("data=", data);
-      const medias = data.pages.flat();
+    setMedias(res);
 
-      setMedias(medias);
-    }
+    return res;
   }, [data, setMedias]);
+
+  //
+  // Tail
+  //
+  // When tail becomes too short => fetch next page
+  //
+
+  const tail = useMemo(
+    () => medias.length - (Math.abs(pos) + 4),
+    [medias, pos]
+  );
+  // console.log("tail=", tail);
+  const isShortTail = tail <= shortTail;
+  // console.log("shortTail=", shortTail);
+
+  useEffect(() => {
+    if (isFetching) return;
+    if (!isShortTail) return;
+
+    console.log("🚛fetchNextPage=", isShortTail);
+    fetchNextPage();
+  }, [isShortTail, fetchNextPage, isFetching]);
 
   return null;
 }

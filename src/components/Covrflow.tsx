@@ -408,6 +408,9 @@ export const CovrflowProvider = forwardRef<
       const newPosTarget =
         typeof x === "function" ? x(posTargetRef.current) : x;
 
+      // Already there => skip
+      if (newPosTarget === posTargetRef.current) return;
+
       console.log(
         "navigating from %s to %s",
         posTargetRef.current,
