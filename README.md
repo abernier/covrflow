@@ -1,5 +1,7 @@
 Try on: [Codespace](https://github.com/codespaces/new?template_repository=abernier%2Ftpl-react-three) | [StackBlitz](https://stackblitz.com/github/abernier/tpl-react-three)
 
+https://youtu.be/-dJu9VyIw64?t=2931
+
 # INSTALL
 
 Pre-requisites:
