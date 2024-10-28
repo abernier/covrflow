@@ -285,7 +285,7 @@ type Options = {
 export const Covrflow = forwardRef<
   ElementRef<typeof CovrflowProvider>,
   {
-    children: ReactNode;
+    children?: ReactNode;
     medias?: Medias;
     options?: Options;
   } & ComponentProps<"group">

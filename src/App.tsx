@@ -257,6 +257,25 @@ function Scene() {
           debug: gui.debug,
         }}
         medias={medias}
+        // medias={[
+        //   {
+        //     color: "gray",
+        //     image: "https://picsum.photos/200/300",
+        //     video: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        //   },
+        //   {
+        //     color: "red",
+        //     image: "https://picsum.photos/200/300",
+        //     video: "https://cdn.jwplayer.com/manifests/pZxWPRg4.m3u8",
+        //     // video: "https://v19-webapp-prime.tiktok.com/video/tos/useast2a/tos-useast2a-ve-0068c001-euttp/oIOLUwA8PBMtQ0EOCViZ7Y7xiwxhBi7TE73I0/?a=1988&bti=ODszNWYuMDE6&ch=0&cr=3&dr=0&lr=all&cd=0%7C0%7C0%7C&cv=1&br=748&bt=374&cs=2&ds=3&eid=256&ft=4fUEKMRh8Zmo0eiLEb4jVlm7upWrKsd.&mime_type=video_mp4&qs=14&rc=ZDVmOmhmZmY7aDloPDkzZEBpajRtZW45cnVtdjMzZjczM0AxMF5jYDY1Xi4xXjBeY2M1YSNxLjZgMmQ0Y15gLS1kMWNzcw%3D%3D&btag=e00090000&expire=1729988302&l=20241026181720E72A1367FE5C6966E058&ply_type=2&policy=2&signature=3cf579acee0b54fdf0248afb3915e4fa&tk=tt_chain_token",
+        //   },
+        //   {
+        //     color: "red",
+        //     image: "https://picsum.photos/200/300",
+        //     video:
+        //       "https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8",
+        //   },
+        // ]}
       >
         <Medias
           query={gui.query}
